@@ -7,6 +7,7 @@
 - 要求: [requirements.md](requirements.md)
 - 構造: [architecture.md](architecture.md)
 - 設計: [design.md](design.md)
+- マニュアル: [manual.md](manual.md)
 - ローダ: [../dwh-loader/architecture.md](../dwh-loader/architecture.md)
 - 位置づけ: 収集アプリのバイナリを、契約者本人の PC に置き、差し替え、消す手順。プロセス分割は [architecture.md](architecture.md)。取得手順と保存形式は [design.md](design.md)。ローダのインストールは対象外。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
@@ -129,7 +130,7 @@ robocopy $stage $dest /MIR
 
 `robocopy` の終了コード 0 から 7 はコピー成功である。8 以上は失敗である。
 
-4. `JvDataCollector.exe` を起動する。作業ディレクトリはインストール先とは限らない。初回設定が利用キー、存在する保存先、取得対象、ログオン起動を揃えるまで、定期取得は始まらない。
+4. `JvDataCollector.exe` を起動する。作業ディレクトリはインストール先とは限らない。初回設定が利用キー、存在する保存先、ログオン起動を揃えるまで、定期取得は始まらない。取得する種類と時刻は標準のスケジュールで始まり、メニューの「蓄積データ」と「開催日の速報」で変える。
 5. Run に書く値は、バージョンを含まない次のフルパスである。
 
 `%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe`

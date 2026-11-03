@@ -8,7 +8,7 @@
 
 1. [requirements.md](requirements.md) で、一式として何をするかを見る。
 2. [architecture.md](architecture.md) で、収集アプリ、DWH ローダ、予想の実行の境界を見る。
-3. 収集アプリは `jv-data-collector/`、ローダと倉庫は `dwh-loader/` を見る。
+3. 収集アプリを動かす手順は [jv-data-collector/manual.md](jv-data-collector/manual.md)。要求と構造は `jv-data-collector/`、ローダと倉庫は `dwh-loader/` を見る。
 
 ## 一覧
 
@@ -16,6 +16,7 @@
 | --- | --- |
 | [requirements.md](requirements.md) | 一式として何をするか。予想を始める契機と、入力にするフルのデータ |
 | [architecture.md](architecture.md) | プロセスの境界とランディング契約 |
+| [jv-data-collector/manual.md](jv-data-collector/manual.md) | 収集アプリを入れて、動かし、止める手順 |
 | [jv-data-collector/requirements.md](jv-data-collector/requirements.md) | 収集アプリの利用者要求と画面 |
 | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) | 収集アプリのプロセス、スレッド、モジュール |
 | [jv-data-collector/design.md](jv-data-collector/design.md) | 取得手順、対象データ、保存形式、受入条件 |

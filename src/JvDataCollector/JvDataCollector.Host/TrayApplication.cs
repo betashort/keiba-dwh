@@ -37,6 +37,8 @@ public sealed class TrayApplication : ApplicationContext
         var menu = new ContextMenuStrip();
         menu.Items.Add("今すぐ取得", null, (_, _) => FetchNow());
         menu.Items.Add("セットアップ", null, (_, _) => Setup());
+        menu.Items.Add("蓄積データ", null, (_, _) => ShowStored());
+        menu.Items.Add("開催日の速報", null, (_, _) => ShowRealtime());
         menu.Items.Add("状態", null, (_, _) => ShowStatus());
         menu.Items.Add("JV-Link 設定", null, (_, _) => OpenJvSettings());
         menu.Items.Add("ログの場所", null, (_, _) => OpenLogs());
@@ -83,6 +85,40 @@ public sealed class TrayApplication : ApplicationContext
 
         var queued = _coordinator.RequestSetup();
         _log.Info(queued ? "setup queued" : "setup waiting");
+    }
+
+    private void ShowStored()
+    {
+        var config = _configs.Load();
+        using var form = new StoredScheduleForm(config);
+        if (form.ShowDialog() != DialogResult.OK || form.Rows is null)
+        {
+            return;
+        }
+
+        var saved = _configs.Load().Copy();
+        saved.StoredSchedule = [.. form.Rows];
+        saved.Dataspecs = form.Rows.Where(row => row.Enabled).Select(row => row.Dataspec).Distinct(StringComparer.Ordinal).ToList();
+        _configs.Save(saved);
+        _coordinator.Reload();
+        _log.Info("stored schedule saved");
+    }
+
+    private void ShowRealtime()
+    {
+        var config = _configs.Load();
+        using var form = new RealtimeScheduleForm(config);
+        if (form.ShowDialog() != DialogResult.OK || form.Data is null || form.Rules is null)
+        {
+            return;
+        }
+
+        var saved = _configs.Load().Copy();
+        saved.RealtimeData = [.. form.Data];
+        saved.RealtimeSchedule = [.. form.Rules];
+        _configs.Save(saved);
+        _coordinator.Reload();
+        _log.Info("realtime schedule saved");
     }
 
     private void ShowStatus()
@@ -147,11 +183,6 @@ public sealed class TrayApplication : ApplicationContext
             return "保存先のフォルダがありません。";
         }
 
-        if (input.Dataspecs.Count == 0)
-        {
-            return "取得対象を 1 つ以上選んでください。";
-        }
-
         if (!input.LaunchAtLogon)
         {
             return "ログオン時起動をオンにしてください。";
@@ -179,7 +210,11 @@ public sealed class TrayApplication : ApplicationContext
         _worker.Invoke(() => _store.Reopen(input.DataRoot));
         var saved = _configs.Load().Copy();
         saved.DataRoot = input.DataRoot;
-        saved.Dataspecs = [.. input.Dataspecs];
+        if (saved.Dataspecs.Count == 0)
+        {
+            saved.Dataspecs = [.. DataspecCatalog.DefaultCodes];
+        }
+
         saved.LaunchAtLogon = true;
         saved.SettingsComplete = true;
         if (string.IsNullOrEmpty(saved.DifferentialEpoch))

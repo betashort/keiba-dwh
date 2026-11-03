@@ -43,7 +43,7 @@ dotnet test src/JvDataCollector/JvDataCollector.slnx
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-collector.ps1
 ```
 
-配置と更新は [docs/jv-data-collector/deployment.md](docs/jv-data-collector/deployment.md)。
+操作は [docs/jv-data-collector/manual.md](docs/jv-data-collector/manual.md)。配置と更新は [docs/jv-data-collector/deployment.md](docs/jv-data-collector/deployment.md)。
 
 ## ライセンス
 

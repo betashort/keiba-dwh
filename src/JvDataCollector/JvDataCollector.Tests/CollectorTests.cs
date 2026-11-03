@@ -336,6 +336,85 @@ public class ScheduleTests
     }
 
     [Fact]
+    public void CustomStoredTimeReplacesTheDefaultSlots()
+    {
+        using var harness = new Harness();
+        var monday = new DateTimeOffset(2026, 11, 2, 5, 0, 0, TimeSpan.Zero);
+        harness.Config.Current.Dataspecs = ["RACE"];
+        harness.Config.Current.StoredSchedule =
+        [
+            new StoredScheduleRow
+            {
+                Id = "c|race",
+                Dataspec = "RACE",
+                Enabled = true,
+                Day = "毎日",
+                Time = "01:00",
+            },
+        ];
+        harness.Coordinator.Reload();
+        harness.Coordinator.CatchUp(monday);
+        Assert.Equal(1, harness.Coordinator.Queue.Count);
+        var job = harness.Coordinator.Queue.TakeDue(monday);
+        Assert.NotNull(job);
+        Assert.Equal("RACE", job.Dataspec);
+        Assert.False(job.WeeklyReread);
+    }
+
+    [Fact]
+    public void EditorKeepsTheDefaultCaptionBesideANarrowSelection()
+    {
+        var rows = SchedulePlan.EditStored(new CollectorConfig { Dataspecs = ["RACE"] });
+        Assert.Contains(rows, row => row.Dataspec == "SLOP" && !row.Enabled);
+        Assert.Contains(rows, row => row.Dataspec == "RACE" && row.Enabled && ScheduleDefaults.StoredCaption(row.Id).Contains("13:30", StringComparison.Ordinal));
+        Assert.Contains("取得する", ScheduleDefaults.StoredCaption(rows.First(row => row.Dataspec == "RACE").Id), StringComparison.Ordinal);
+        var rules = SchedulePlan.EditRealtime(new CollectorConfig());
+        var odds = rules.Single(row => row.Kind == ScheduleKind.OddsMeeting);
+        Assert.Equal(3, odds.IntervalMinutes);
+        Assert.Contains("09:00", ScheduleDefaults.RealtimeCaption(odds.Id), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DisabledRealtimeSpecIsLeftOutOfTheEvent()
+    {
+        using var harness = new Harness();
+        harness.Config.Current.RealtimeData = DataspecCatalog.Realtime
+            .Select(item => new RealtimeDataRow { Dataspec = item.Code, Enabled = item.Code != "0B11" })
+            .ToList();
+        harness.Coordinator.Reload();
+        harness.Coordinator.OnRealtime(RealtimeEventKind.Weight, "2026110805010101");
+        var specs = new List<string>();
+        while (harness.Coordinator.Queue.TakeDue(harness.Clock.UtcNow) is { } job)
+        {
+            specs.Add(job.Dataspec);
+        }
+
+        Assert.Equal(["0B13", "0B17"], specs);
+    }
+
+    [Fact]
+    public void OddsSweepKeepsTheConfiguredInterval()
+    {
+        using var harness = new Harness();
+        var rules = ScheduleDefaults.RealtimeRows().Select(row => row.Copy()).ToList();
+        rules.Single(row => row.Kind == ScheduleKind.OddsMeeting).IntervalMinutes = 10;
+        harness.Config.Current.RealtimeSchedule = rules;
+        harness.Coordinator.Reload();
+        var start = new DateTimeOffset(2026, 11, 7, 1, 0, 0, TimeSpan.Zero);
+        harness.Coordinator.MaybeEnqueueOdds(start);
+        Assert.Equal(DataspecCatalog.OddsSweep.Length, harness.Coordinator.Queue.Count);
+        while (harness.Coordinator.Queue.TakeDue(start) is { } job)
+        {
+            harness.Coordinator.OnJobFinished(job);
+        }
+
+        harness.Coordinator.MaybeEnqueueOdds(start.AddMinutes(4));
+        Assert.Equal(0, harness.Coordinator.Queue.Count);
+        harness.Coordinator.MaybeEnqueueOdds(start.AddMinutes(10));
+        Assert.Equal(DataspecCatalog.OddsSweep.Length, harness.Coordinator.Queue.Count);
+    }
+
+    [Fact]
     public void WeightAndChangeEventsQueueTheRequiredSpecs()
     {
         var weight = RealtimePlanner.ForEvent(RealtimeEventKind.Weight, "2026110805010101");

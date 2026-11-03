@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace JvDataCollector;
 
 public interface IClock
@@ -193,6 +195,15 @@ public sealed class CollectorConfig
     public bool SettingsComplete { get; set; }
     public string? DifferentialEpoch { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<StoredScheduleRow>? StoredSchedule { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RealtimeDataRow>? RealtimeData { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RealtimeScheduleRow>? RealtimeSchedule { get; set; }
+
     public CollectorConfig Copy() => new()
     {
         DataRoot = DataRoot,
@@ -200,5 +211,8 @@ public sealed class CollectorConfig
         LaunchAtLogon = LaunchAtLogon,
         SettingsComplete = SettingsComplete,
         DifferentialEpoch = DifferentialEpoch,
+        StoredSchedule = StoredSchedule?.Select(row => row.Copy()).ToList(),
+        RealtimeData = RealtimeData?.Select(row => row.Copy()).ToList(),
+        RealtimeSchedule = RealtimeSchedule?.Select(row => row.Copy()).ToList(),
     };
 }

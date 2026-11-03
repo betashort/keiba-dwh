@@ -6,7 +6,7 @@ public static class SchedulePlanner
 {
     public static IReadOnlyList<PlannedWork> Due(
         DateTimeOffset utcNow,
-        IReadOnlyList<string> enabled,
+        SchedulePlan plan,
         IReadOnlySet<string> option1Rejected,
         IReadOnlyCollection<string> meetingDays)
     {
@@ -14,71 +14,89 @@ public static class SchedulePlanner
         var today = DateOnly.FromDateTime(jst.DateTime);
         var time = TimeOnly.FromTimeSpan(jst.TimeOfDay);
         var works = new List<PlannedWork>();
-        foreach (var slot in Slots)
+        foreach (var row in plan.Stored)
         {
-            if (time < slot.Time)
+            if (!row.Enabled || option1Rejected.Contains(row.Dataspec))
             {
                 continue;
             }
 
-            if (slot.Day is not null && jst.DayOfWeek != slot.Day)
+            if (!ScheduleText.TryDay(row.Day, out var day) || !ScheduleText.TryTime(row.Time, out var slot))
             {
                 continue;
             }
 
-            var specs = slot.All
-                ? enabled.Where(spec => !option1Rejected.Contains(spec)).ToArray()
-                : slot.Specs.Where(spec => enabled.Contains(spec) && !option1Rejected.Contains(spec)).ToArray();
-            foreach (var spec in specs)
+            if (time < slot)
             {
-                works.Add(Stored(today, slot.Time, spec, slot.Weekly));
+                continue;
             }
+
+            if (day is not null && jst.DayOfWeek != day)
+            {
+                continue;
+            }
+
+            works.Add(Stored(today, slot, row.Dataspec, row.WeeklyReread));
         }
 
-        var weekly = works.Where(item => item.Job.WeeklyReread).Select(item => item.Job.Dataspec).ToHashSet();
+        var weekly = works.Where(item => item.Job.WeeklyReread).Select(item => item.Job.Dataspec).ToHashSet(StringComparer.Ordinal);
         works.RemoveAll(item => !item.Job.WeeklyReread && item.Job.Kind == JobKind.Stored && weekly.Contains(item.Job.Dataspec));
 
-        if (time >= new TimeOnly(8, 0) && MeetingCalendar.IsMeetingDay(today, meetingDays))
+        foreach (var rule in plan.Realtime)
         {
-            var day = today.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
-            works.Add(Realtime(today, new TimeOnly(8, 0), "0B14", day));
-            works.Add(Realtime(today, new TimeOnly(8, 0), "0B15", day));
-            works.Add(Realtime(today, new TimeOnly(8, 0), "0B13", day));
-            works.Add(Realtime(today, new TimeOnly(8, 0), "0B17", day));
-        }
-
-        if (time >= new TimeOnly(13, 30) && MeetingCalendar.IsMeetingSide(today, meetingDays))
-        {
-            var day = today.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
-            works.Add(Realtime(today, new TimeOnly(13, 30), "0B15", day));
-            works.Add(Realtime(today, new TimeOnly(13, 30), "0B13", day));
-            works.Add(Realtime(today, new TimeOnly(13, 30), "0B17", day));
-        }
-
-        if (jst.DayOfWeek == DayOfWeek.Thursday && time >= new TimeOnly(21, 0))
-        {
-            foreach (var day in MeetingCalendar.UpcomingMeetingDays(today, meetingDays))
+            if (!rule.Enabled || !ScheduleText.TryTime(rule.Start, out var start) || time < start)
             {
-                works.Add(Realtime(today, new TimeOnly(21, 0), "0B15", day));
+                continue;
+            }
+
+            switch (rule.Kind)
+            {
+                case ScheduleKind.ThursdayUpcoming:
+                    if (!ScheduleText.TryWeekday(rule.Day, out var weekday) || jst.DayOfWeek != weekday)
+                    {
+                        break;
+                    }
+
+                    foreach (var day in MeetingCalendar.UpcomingMeetingDays(today, meetingDays))
+                    {
+                        AddRealtime(works, plan, rule, today, start, day);
+                    }
+
+                    break;
+                case ScheduleKind.MeetingSide:
+                    if (!MeetingCalendar.IsMeetingSide(today, meetingDays))
+                    {
+                        break;
+                    }
+
+                    AddRealtime(works, plan, rule, today, start, today.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture));
+                    break;
+                case ScheduleKind.MeetingOpen:
+                    if (!MeetingCalendar.IsMeetingDay(today, meetingDays))
+                    {
+                        break;
+                    }
+
+                    AddRealtime(works, plan, rule, today, start, today.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture));
+                    break;
             }
         }
 
         return works;
     }
 
-    public static DateTimeOffset? NextUtc(DateTimeOffset utcNow, string dataspec, IReadOnlyList<string> enabled)
+    public static DateTimeOffset? NextUtc(
+        DateTimeOffset utcNow,
+        string dataspec,
+        SchedulePlan plan,
+        IReadOnlyCollection<string> meetingDays)
     {
-        if (!enabled.Contains(dataspec) && dataspec is not ("0B13" or "0B14" or "0B15" or "0B17"))
-        {
-            return null;
-        }
-
         var jst = Jst.Now(utcNow);
         var start = DateOnly.FromDateTime(jst.DateTime);
         for (var offset = 0; offset < 8; offset++)
         {
             var day = start.AddDays(offset);
-            foreach (var slot in CandidateTimes(dataspec, day.DayOfWeek).Order())
+            foreach (var slot in Times(plan, dataspec, day, meetingDays).Order())
             {
                 var moment = new DateTime(day, slot, DateTimeKind.Unspecified);
                 var zoned = new DateTimeOffset(moment, jst.Offset);
@@ -92,42 +110,70 @@ public static class SchedulePlanner
         return null;
     }
 
-    private static IEnumerable<TimeOnly> CandidateTimes(string dataspec, DayOfWeek day)
+    private static IEnumerable<TimeOnly> Times(SchedulePlan plan, string dataspec, DateOnly day, IReadOnlyCollection<string> meetingDays)
     {
-        foreach (var slot in Slots)
+        foreach (var row in plan.Stored)
         {
-            if (slot.Day is not null && slot.Day != day)
+            if (!row.Enabled || !string.Equals(row.Dataspec, dataspec, StringComparison.Ordinal))
             {
                 continue;
             }
 
-            var stored = DataspecCatalog.Stored.Any(item => item.Code == dataspec);
-            if (slot.All)
+            if (!ScheduleText.TryDay(row.Day, out var rowDay) || !ScheduleText.TryTime(row.Time, out var time))
             {
-                if (stored)
-                {
-                    yield return slot.Time;
-                }
+                continue;
             }
-            else if (slot.Specs.Contains(dataspec))
+
+            if (rowDay is null || rowDay == day.DayOfWeek)
             {
-                yield return slot.Time;
+                yield return time;
             }
         }
 
-        if (dataspec is "0B13" or "0B15" or "0B17")
+        if (!plan.IsRealtimeEnabled(dataspec))
         {
-            yield return new TimeOnly(13, 30);
+            yield break;
         }
 
-        if (dataspec is "0B13" or "0B14" or "0B15" or "0B17")
+        foreach (var rule in plan.Realtime)
         {
-            yield return new TimeOnly(8, 0);
-        }
+            if (!rule.Enabled || !rule.Dataspecs.Contains(dataspec, StringComparer.Ordinal) || !ScheduleText.TryTime(rule.Start, out var start))
+            {
+                continue;
+            }
 
-        if (dataspec == "0B15" && day == DayOfWeek.Thursday)
+            switch (rule.Kind)
+            {
+                case ScheduleKind.ThursdayUpcoming:
+                    if (ScheduleText.TryWeekday(rule.Day, out var weekday) && day.DayOfWeek == weekday)
+                    {
+                        yield return start;
+                    }
+
+                    break;
+                case ScheduleKind.MeetingSide:
+                    if (MeetingCalendar.IsMeetingSide(day, meetingDays))
+                    {
+                        yield return start;
+                    }
+
+                    break;
+                case ScheduleKind.MeetingOpen:
+                    if (MeetingCalendar.IsMeetingDay(day, meetingDays))
+                    {
+                        yield return start;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private static void AddRealtime(List<PlannedWork> works, SchedulePlan plan, RealtimeScheduleRow rule, DateOnly today, TimeOnly start, string key)
+    {
+        foreach (var spec in plan.Specs(rule))
         {
-            yield return new TimeOnly(21, 0);
+            works.Add(Realtime(today, start, spec, key));
         }
     }
 
@@ -156,19 +202,4 @@ public static class SchedulePlanner
             MeetingDay = key.Length >= 8 ? key[..8] : key,
         });
     }
-
-    private readonly record struct Slot(TimeOnly Time, DayOfWeek? Day, string[] Specs, bool All, bool Weekly);
-
-    private static readonly Slot[] Slots =
-    [
-        new(new TimeOnly(6, 30), null, ["SLOP", "WOOD"], false, false),
-        new(new TimeOnly(6, 30), DayOfWeek.Monday, [], true, true),
-        new(new TimeOnly(13, 30), null, [], true, false),
-        new(new TimeOnly(15, 0), DayOfWeek.Monday, ["DIFF", "DIFN", "BLOD", "BLDN", "SNAP", "SNPN", "YSCH", "MING", "RACE"], false, false),
-        new(new TimeOnly(21, 0), DayOfWeek.Thursday, ["RACE", "DIFF", "DIFN", "BLOD", "BLDN", "SNAP", "SNPN"], false, false),
-        new(new TimeOnly(21, 0), DayOfWeek.Sunday, ["TOKU"], false, false),
-        new(new TimeOnly(21, 0), DayOfWeek.Monday, ["TOKU"], false, false),
-        new(new TimeOnly(12, 0), DayOfWeek.Tuesday, ["HOYU"], false, false),
-        new(new TimeOnly(23, 0), null, [], true, false),
-    ];
 }

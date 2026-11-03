@@ -60,28 +60,26 @@ public static class MeetingCalendar
 
 public static class OddsWindow
 {
-    public static bool IsOpen(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays)
+    public static bool Contains(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays, RealtimeScheduleRow rule)
     {
-        var day = DateOnly.FromDateTime(jst.DateTime);
-        var time = TimeOnly.FromTimeSpan(jst.TimeOfDay);
-        if (MeetingCalendar.IsMeetingDay(day, meetingDays) && time >= new TimeOnly(9, 0) && time < new TimeOnly(17, 0))
+        if (!ScheduleText.TryTime(rule.Start, out var start) || !ScheduleText.TryTime(rule.End, out var end))
         {
-            return true;
+            return false;
         }
 
-        return jst.DayOfWeek == DayOfWeek.Friday
-            && time >= new TimeOnly(19, 0)
-            && time < new TimeOnly(21, 0)
-            && WeekendSale(day, meetingDays);
-    }
-
-    public static bool WatchDesired(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays)
-    {
         var day = DateOnly.FromDateTime(jst.DateTime);
         var time = TimeOnly.FromTimeSpan(jst.TimeOfDay);
-        return MeetingCalendar.IsMeetingDay(day, meetingDays)
-            && time >= new TimeOnly(8, 0)
-            && time < new TimeOnly(17, 30);
+        if (time < start || time >= end)
+        {
+            return false;
+        }
+
+        if (rule.Kind == ScheduleKind.OddsFriday)
+        {
+            return jst.DayOfWeek == DayOfWeek.Friday && WeekendSale(day, meetingDays);
+        }
+
+        return MeetingCalendar.IsMeetingDay(day, meetingDays);
     }
 
     private static bool WeekendSale(DateOnly friday, IReadOnlyCollection<string> meetingDays)
@@ -135,9 +133,14 @@ public static class RealtimePlanner
         };
     }
 
-    public static IReadOnlyList<CollectionJob> Odds(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays, IReadOnlyList<string> raceKeys)
+    public static IReadOnlyList<CollectionJob> Odds(
+        DateTimeOffset jst,
+        IReadOnlyCollection<string> meetingDays,
+        IReadOnlyList<string> raceKeys,
+        RealtimeScheduleRow rule,
+        IReadOnlyList<string> specs)
     {
-        var targets = TargetDays(jst, meetingDays);
+        var targets = TargetDays(jst, meetingDays, rule);
         var keys = new List<string>();
         foreach (var race in raceKeys)
         {
@@ -156,7 +159,7 @@ public static class RealtimePlanner
         foreach (var key in keys)
         {
             var day = key.Length >= 8 ? key[..8] : key;
-            foreach (var spec in DataspecCatalog.OddsSweep)
+            foreach (var spec in specs)
             {
                 jobs.Add(new CollectionJob
                 {
@@ -173,28 +176,24 @@ public static class RealtimePlanner
         return jobs;
     }
 
-    public static IReadOnlyList<string> TargetDays(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays)
+    public static IReadOnlyList<string> TargetDays(DateTimeOffset jst, IReadOnlyCollection<string> meetingDays, RealtimeScheduleRow rule)
     {
         var day = DateOnly.FromDateTime(jst.DateTime);
-        var list = new List<string>();
-        var time = TimeOnly.FromTimeSpan(jst.TimeOfDay);
-        if (MeetingCalendar.IsMeetingDay(day, meetingDays) && time >= new TimeOnly(9, 0) && time < new TimeOnly(17, 0))
+        if (rule.Kind == ScheduleKind.OddsFriday)
         {
-            list.Add(day.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture));
+            return MeetingCalendar.UpcomingWeekend(day)
+                .Where(item => item != day && MeetingCalendar.IsMeetingDay(item, meetingDays))
+                .Select(item => item.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
         }
 
-        if (jst.DayOfWeek == DayOfWeek.Friday && time >= new TimeOnly(19, 0) && time < new TimeOnly(21, 0))
+        if (!MeetingCalendar.IsMeetingDay(day, meetingDays))
         {
-            foreach (var upcoming in MeetingCalendar.UpcomingWeekend(day).SkipWhile(item => item == day))
-            {
-                if (MeetingCalendar.IsMeetingDay(upcoming, meetingDays))
-                {
-                    list.Add(upcoming.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture));
-                }
-            }
+            return [];
         }
 
-        return list.Distinct(StringComparer.Ordinal).ToArray();
+        return [day.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture)];
     }
 
     private static CollectionJob Event(string spec, string key, string day) => new()

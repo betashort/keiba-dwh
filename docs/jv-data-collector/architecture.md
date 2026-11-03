@@ -7,6 +7,7 @@
 - 要求: [requirements.md](requirements.md)
 - 設計: [design.md](design.md)
 - デプロイ: [deployment.md](deployment.md)
+- マニュアル: [manual.md](manual.md)
 - ローダ: [../dwh-loader/architecture.md](../dwh-loader/architecture.md)
 - 倉庫: [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)
 - 位置づけ: プロセスとモジュールの構造。取得手順、対象データ、保存形式、画面の振る舞い、受入条件は [design.md](design.md)。インストール先と更新は [deployment.md](deployment.md)。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。

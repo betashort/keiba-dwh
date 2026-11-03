@@ -125,7 +125,7 @@ public sealed class CollectionCoordinator
             return;
         }
 
-        var works = SchedulePlanner.Due(utcNow, _config.Dataspecs, _rejected, _ledger.MeetingDays());
+        var works = SchedulePlanner.Due(utcNow, SchedulePlan.From(_config), _rejected, _ledger.MeetingDays());
         foreach (var work in works)
         {
             if (_ledger.WasFired(work.FireKey))
@@ -154,12 +154,16 @@ public sealed class CollectionCoordinator
 
         var jst = Jst.Now(utcNow);
         var days = _ledger.MeetingDays();
-        if (!OddsWindow.IsOpen(jst, days) || utcNow - _lastOdds < TimeSpan.FromMinutes(3))
+        var plan = SchedulePlan.From(_config);
+        var rule = plan.OpenOdds(jst, days);
+        var interval = rule is null || rule.IntervalMinutes <= 0 ? 3 : rule.IntervalMinutes;
+        if (rule is null || utcNow - _lastOdds < TimeSpan.FromMinutes(interval))
         {
             return;
         }
 
-        var jobs = RealtimePlanner.Odds(jst, days, _ledger.RaceKeysForDays(RealtimePlanner.TargetDays(jst, days)));
+        var specs = plan.Specs(rule).ToArray();
+        var jobs = RealtimePlanner.Odds(jst, days, _ledger.RaceKeysForDays(RealtimePlanner.TargetDays(jst, days, rule)), rule, specs);
         if (_queue.AddOdds(jobs))
         {
             _lastOdds = utcNow;
@@ -173,7 +177,7 @@ public sealed class CollectionCoordinator
             return false;
         }
 
-        return OddsWindow.WatchDesired(Jst.Now(utcNow), _ledger.MeetingDays());
+        return SchedulePlan.From(_config).WatchOpen(Jst.Now(utcNow), _ledger.MeetingDays());
     }
 
     public bool RequestUserFetch()
@@ -201,9 +205,13 @@ public sealed class CollectionCoordinator
             return;
         }
 
+        var enabled = SchedulePlan.From(_config);
         foreach (var job in RealtimePlanner.ForEvent(kind, key))
         {
-            _queue.TryAdd(job);
+            if (enabled.IsRealtimeEnabled(job.Dataspec))
+            {
+                _queue.TryAdd(job);
+            }
         }
     }
 
@@ -299,24 +307,29 @@ public sealed class CollectionCoordinator
     public IReadOnlyList<StatusLine> Status(DateTimeOffset utcNow)
     {
         Reload();
+        var plan = SchedulePlan.From(_config);
+        var days = _ledger.MeetingDays();
         var lines = new List<StatusLine>();
         foreach (var spec in _config.Dataspecs)
         {
-            lines.Add(Line(spec, 1, utcNow));
+            lines.Add(Line(spec, 1, utcNow, plan, days));
         }
 
         foreach (var spec in new[] { "0B11", "0B12", "0B13", "0B14", "0B15", "0B16", "0B17" })
         {
-            lines.Add(Line(spec, 0, utcNow));
+            if (plan.IsRealtimeEnabled(spec))
+            {
+                lines.Add(Line(spec, 0, utcNow, plan, days));
+            }
         }
 
         return lines;
     }
 
-    private StatusLine Line(string spec, int option, DateTimeOffset utcNow)
+    private StatusLine Line(string spec, int option, DateTimeOffset utcNow, SchedulePlan plan, IReadOnlyCollection<string> meetingDays)
     {
         var mark = _ledger.GetWatermark(spec, option);
-        var next = SchedulePlanner.NextUtc(utcNow, spec, _config.Dataspecs);
+        var next = SchedulePlanner.NextUtc(utcNow, spec, plan, meetingDays);
         return new StatusLine(
             spec,
             DataspecCatalog.NameOf(spec),
