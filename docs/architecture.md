@@ -1,7 +1,7 @@
 # 競馬データ倉庫 アーキテクチャ
 
 - 状態: ドラフト
-- 日付: 2026-11-02
+- 日付: 2026-11-03
 - 要求: [requirements.md](requirements.md)
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
@@ -98,6 +98,8 @@ flowchart TB
 | `DataRoot\state\ledger.sqlite` | 収集アプリ | 水位、実行履歴、索引、`0B14` の世代 |
 | PostgreSQL | ローダ | 解釈済みの行。同一 PC |
 
+収集アプリのバイナリの置き場所と更新は [jv-data-collector/deployment.md](jv-data-collector/deployment.md)。
+
 PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/warehouse.md](dwh-loader/warehouse.md)。
 
 ## 5. 技術選定
@@ -122,6 +124,7 @@ PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/wareh
 | [jv-data-collector/requirements.md](jv-data-collector/requirements.md) | 収集アプリの利用者要求と画面 |
 | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) | 収集アプリのプロセス、スレッド、モジュール |
 | [jv-data-collector/design.md](jv-data-collector/design.md) | 取得手順、対象データ、保存形式、受入条件 |
+| [jv-data-collector/deployment.md](jv-data-collector/deployment.md) | 収集アプリのインストール先、公開、更新、削除 |
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
 | [dwh-loader/warehouse.md](dwh-loader/warehouse.md) | PostgreSQL の採用 |

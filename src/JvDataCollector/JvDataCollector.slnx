@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="JvDataCollector.Application/JvDataCollector.Application.csproj" />
+  <Project Path="JvDataCollector.Host/JvDataCollector.Host.csproj" />
+  <Project Path="JvDataCollector.JvLink/JvDataCollector.JvLink.csproj" />
+  <Project Path="JvDataCollector.Storage/JvDataCollector.Storage.csproj" />
+  <Project Path="JvDataCollector.Tests/JvDataCollector.Tests.csproj" />
+</Solution>
