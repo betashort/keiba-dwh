@@ -47,9 +47,9 @@ internal static class Program
             new ThreadDelay(),
             () => Application.DoEvents());
         worker.Attach(coordinator);
-        if (!JvRegistration.Is64BitRegistered)
+        if (!JvRegistration.IsInstalled)
         {
-            attention.Raise(AttentionReason.JvLinkMissing, "64bit の JV-Link がありません。");
+            attention.Raise(AttentionReason.JvLinkMissing, "32bit の JV-Link がありません。");
         }
         else if (!secrets.Exists || !config.SettingsComplete)
         {
@@ -84,7 +84,7 @@ internal static class Program
         };
         scheduler.Start();
         var tray = new TrayApplication(coordinator, worker, store, configs, secrets, log, attention);
-        if (!JvRegistration.Is64BitRegistered)
+        if (!JvRegistration.IsInstalled)
         {
             using var guide = new GuideForm();
             guide.ShowDialog();

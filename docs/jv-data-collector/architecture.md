@@ -14,7 +14,7 @@
 
 ## 1. 結論
 
-収集アプリは、契約者のログオン セッションで動く C# / Windows Forms の 64bit トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`（.NET 8 以降のうち現行 LTS の .NET 10）とする。Windows サービスにはしない。
+収集アプリは、契約者のログオン セッションで動く C# / Windows Forms の 32bit トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`（.NET 8 以降のうち現行 LTS の .NET 10）とする。Windows サービスにはしない。
 
 プロセスの中は 4 つのモジュールに分かれる。画面、取得の判断、JV-Link 呼び出し、ランディングへの書き込みは互いに直接参照しない。JV-Link の COM 呼び出しは専用 STA スレッド 1 本に直列化し、`JVOpen` から `JVClose` までのセッションは同時に 1 つだけ開く。
 
@@ -41,7 +41,7 @@
 flowchart LR
   user["契約者"]
   app["収集アプリ"]
-  jvlink["JV-Link 5.0.0 64bit"]
+  jvlink["JV-Link 5.0.0 32bit"]
   server["Data Lab. サーバ"]
   disk["ランディング"]
   loader["倉庫ローダ（別プロセス）"]
@@ -67,13 +67,13 @@ flowchart LR
 
 1 台の PC、1 人のログオン セッション、1 プロセス。二重起動は名前付きミューテックス `Local\KeibaDwh.Collector` で拒む。JV-Link の設定画面は同時に開けず、セッションを重ねると `JVOpen` が `-202` になるためである。
 
-プロセスは C#、Windows Forms、x64 に固定し、ビット数は JV-Link と一致させる。ターゲットフレームワークは `net10.0-windows`。初期対象は SDK 5.0.0 の 64bit と、日本語版 Windows 11 である。
+プロセスは C#、Windows Forms、x86 に固定し、公式の 32bit JV-Link とビット数を一致させる。ターゲットフレームワークは `net10.0-windows`。初期対象は SDK 5.0.0 の 32bit と、日本語版 Windows 11 である。
 
 ```mermaid
 flowchart TB
   subgraph pc["契約者の PC"]
     subgraph session["ログオン セッション（対話デスクトップ）"]
-      subgraph proc["収集アプリ net10.0-windows x64"]
+      subgraph proc["収集アプリ net10.0-windows x86"]
         ui["UI スレッド"]
         sched["スケジューラ"]
         sta["COM STA スレッド"]
@@ -442,7 +442,7 @@ sequenceDiagram
 | 項目 | 決定 |
 | --- | --- |
 | 言語 | C# |
-| ランタイム | .NET 8 以降。実装ターゲットは .NET 10（`net10.0-windows`）、x64 |
+| ランタイム | .NET 8 以降。実装ターゲットは .NET 10（`net10.0-windows`）、x86 |
 | UI | Windows Forms。`NotifyIcon` と状態ウィンドウ |
 | COM | 登録済みの `JVDTLabLib.JVLink`。専用 STA |
 | 台帳 | SQLite。WAL。アプリとローダが同時に読めるようにする |
@@ -460,7 +460,7 @@ SDK に含まれる C# の構造体はローダが使う。収集アプリは構
 | ID | 決定 |
 | --- | --- |
 | AD-01 | プロセスはログオン セッションのトレイ アプリ 1 つ。サービスにしない |
-| AD-02 | C#、Windows Forms、x64、`net10.0-windows`。JV-Link 64bit と対にする |
+| AD-02 | C#、Windows Forms、x86、`net10.0-windows`。公式の JV-Link 32bit と対にする |
 | AD-03 | COM は STA 1 本。セッションは同時に 1 つ。イベント コールバックはキューへ入れるだけ |
 | AD-04 | 定時の 1 ジョブは dataspec 1 つ。dataspec の境界でのみ速報を挟む |
 | AD-05 | 確定水位と再開カーソルを分け、中断時は確定水位を進めない |

@@ -14,7 +14,7 @@
   - [JV-Data 仕様書 Ver.4.9.0.1](https://jra-van.jp/dlb/sdv/sdk/JV-Data4901.pdf)（2024-08-07）
   - [JV-Link インターフェース仕様書 Ver.4.9.0.1](https://jra-van.jp/dlb/sdv/sdk/JV-Link4901.pdf)（2024-08-07）
   - [開発ガイド 第4.2.3版](https://jra-van.jp/dlb/sdv/sdk/DataLab423.pdf)（2026-07-31）
-  - SDK 本体は [32bit / 64bit Ver.5.0.0](https://jra-van.jp/dlb/sdv/sdk.html)（2026-08-04）
+  - SDK 本体は [32bit Ver.5.0.0](https://jra-van.jp/dlb/sdv/sdk.html)（2026-08-04）
 
 この文書は、要求を満たすための取得手順、対象データ、保存形式、受入条件を定義する。プロセス分割とスレッドは [architecture.md](architecture.md)。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
@@ -22,7 +22,7 @@
 
 - 開発ガイド 2.1 の JV-Link 動作環境は、日本語版 Windows 11、インターネット接続。
 - JV-Link は利用者がインストールし、利用規約に同意済みである。同意前の `JVOpen` は `-305` になる。
-- SDK 5.0.0 以降、32bit 版と 64bit 版は同一 PC に共存できる。利用キーはビット数ごとに別登録が必要で、ソフト ID は共有する。設定画面は同時に開けない。アプリのプロセスビット数は、使う JV-Link と一致させる。
+- 公式に配布される JV-Link は 32bit である。アプリのプロセスは x86 とし、32bit の COM サーバだけを使う。設定画面は同時に開けない。
 - JV-Link の設定はユーザのレジストリにあり、設定ダイアログは対話デスクトップを必要とする。収集はログオン中のセッションで行う。Session 0 の Windows サービスからは呼ばない。
 - COM 呼び出しは専用の STA スレッド 1 本に直列化する。`JVOpen` から `JVClose` までを重ねない（重ねると `-202`）。
 - 時刻は日本標準時。`fromtime` は `YYYYMMDDhhmmss`。
@@ -32,15 +32,15 @@
 
 ## 2. 実装の枠
 
-実装は C#、Windows Forms、x64 のトレイアプリとする。ターゲットフレームワークは `net10.0-windows`（.NET 8 以降。採用するのは現行 LTS の .NET 10。サポート期限 2028-11-14）。.NET 8 と .NET 9 は 2026-11-10 にサポートが終わるため、新規の TFM にはしない。モジュール分割、スレッド、配置は [architecture.md](architecture.md)。
+実装は C#、Windows Forms、x86 のトレイアプリとする。ターゲットフレームワークは `net10.0-windows`（.NET 8 以降。採用するのは現行 LTS の .NET 10。サポート期限 2028-11-14）。.NET 8 と .NET 9 は 2026-11-10 にサポートが終わるため、新規の TFM にはしない。モジュール分割、スレッド、配置は [architecture.md](architecture.md)。
 
 設定は `%AppData%` 配下の JSON。利用キーは DPAPI で暗号化し、画面とログに出さない。構造体は後続ローダが使い、収集アプリはバイト列を分解しない。
 
 2026-10-24 決定。
 
-- 言語は C#。UI は Windows Forms。プロセスは x64。
+- 言語は C#。UI は Windows Forms。プロセスは x86。
 - ターゲットフレームワークは `net10.0-windows`。.NET 8 以降のうち、現行 LTS の .NET 10 を使う。
-- ログオン起動のトレイ常駐。ビット数は SDK 5.0.0 の 64bit JV-Link に合わせる。
+- ログオン起動のトレイ常駐。ビット数は公式の 32bit JV-Link に合わせる。
 - 倉庫データベースは PostgreSQL。書くのは倉庫ローダだけで、収集アプリは接続しない。詳細は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)。
 - 収集アプリの正本はローカル raw と SQLite。倉庫の PostgreSQL へは直接書かない。
 - 初回の全期間取得は利用者の開始操作だけ。定期実行は option = 1。
@@ -276,7 +276,7 @@ flowchart TD
 
 アイコンは待機、取得中、要対応の 3 状態。要対応は利用キー拒否、規約未同意、JV-Link 未設定、保存先に書けない、ディスク残量 5 GB 未満。通信の一時失敗では要対応にしない。
 
-状態ウィンドウは dataspec ごとに、option、水位、最終成功、最終件数、最終エラー、次回予定を出す。取得中は `JVStatus / downloadcount` を表示する。
+状態ウィンドウは dataspec ごとに、option、水位、最終成功、最終件数、最終エラー、次回予定を出す。取得中はプログレスバーを出す。ダウンロード中は `JVStatus / downloadcount`、読み込み中は `m_CurrentReadFilesize / m_TotalReadFilesize`（KB。取れないときは読了ファイル数 / `readcount`）である。蓄積の取り込み中は、同じ内容の窓を自動で開く。閉じても取得は止めない。
 
 「今すぐ取得」は option = 1 を 1 巡する。実行中の要求は 1 件だけキューに積む。
 
@@ -361,9 +361,8 @@ SQLite に次を持つ。
 | JV-Data 仕様書 Excel | 同上 | <https://jra-van.jp/dlb/sdv/sdk/JV-Data4901.xlsx> | フォーマットシートとデータ種別一覧シート。パーサ実装時の作業用 |
 | JV-Link インターフェース仕様書 | 4.9.0.1（2024-08-07） | <https://jra-van.jp/dlb/sdv/sdk/JV-Link4901.pdf> | メソッド、`option` と dataspec の組合せ、戻り値 |
 | 開発ガイド | 4.2.3（2026-07-31） | <https://jra-van.jp/dlb/sdv/sdk/DataLab423.pdf> | 動作環境、蓄積系の取得手順、`fromtime` の管理、サンプルの流れ |
-| SDK 32bit | 5.0.0（2026-08-04） | <https://jra-van.jp/dlb/sdv/sdk/JVDTLABSDK500_32bit.zip> | JV-Link、構造体、VB2019 / VC2019 サンプル、検証ツール |
-| SDK 64bit | 5.0.0（2026-08-04） | <https://jra-van.jp/dlb/sdv/sdk/JVDTLABSDK500_64bit.zip> | JV-Link、構造体（C# / C++ / VB / Python）、VB2026 / VC2026 / Python 3.14 サンプル、検証ツール |
-| SDK 案内 | 5.0.0 | <https://developer.jra-van.jp/t/topic/45> | 上記ドキュメントへの入口。64bit 追加の注意は [告知トピック](https://developer.jra-van.jp/t/topic/959) |
+| SDK 32bit | 5.0.0（2026-08-04） | <https://jra-van.jp/dlb/sdv/sdk/JVDTLABSDK500_32bit.zip> | このアプリが使う JV-Link。構造体、VB2019 / VC2019 サンプル、検証ツール |
+| SDK 案内 | 5.0.0 | <https://developer.jra-van.jp/t/topic/45> | 上記ドキュメントへの入口 |
 | イベント開発ガイド（VB / C++） | 2026-08-04 版が SDK 案内に記載 | [SDK トピック](https://developer.jra-van.jp/t/topic/45) 内のリンク | `JVWatchEvent` の言語別の購読方法 |
 
 旧版 PDF（`JV-Data490.pdf` は Ver.4.9.0、`JV-Data480.pdf` は Ver.4.8.0）は履歴確認用。実装の正は 4.9.0.1。

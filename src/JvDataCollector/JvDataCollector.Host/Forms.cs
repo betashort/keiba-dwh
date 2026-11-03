@@ -33,9 +33,7 @@ public sealed class GuideForm : Form
             AutoSize = false,
             Location = DialogPx.P(16, 16),
             Size = DialogPx.Z(488, 140),
-            Text = JvRegistration.Is32BitInstalled && !JvRegistration.Is64BitRegistered
-                ? "32bit 版の JV-Link は入っています。このアプリは 64bit 版が必要です。SDK 5.0.0 の 64bit を導入し、利用規約に同意してから、起動し直してください。利用キーはビット数ごとに別登録です。入手先: https://jra-van.jp/dlb/sdv/sdk.html このアプリは JV-Link を同梱しません。"
-                : "64bit の JV-Link が見つかりません。JRA-VAN Data Lab. SDK 5.0.0 の 64bit 版をインストールし、利用規約に同意してから、このアプリを起動し直してください。入手先: https://jra-van.jp/dlb/sdv/sdk.html このアプリは JV-Link を同梱しません。",
+            Text = "32bit の JV-Link が見つかりません。公式の JRA-VAN Data Lab. SDK 5.0.0（32bit）をインストールし、利用規約に同意してから、このアプリを起動し直してください。入手先: https://jra-van.jp/dlb/sdv/sdk.html このアプリは JV-Link を同梱しません。",
         };
         var close = new Button { Text = "閉じる", DialogResult = DialogResult.OK, Location = DialogPx.P(408, 172), Size = DialogPx.Z(96, 28) };
         Controls.Add(message);
@@ -47,6 +45,7 @@ public sealed class GuideForm : Form
 public sealed class SetupForm : Form
 {
     private readonly TextBox _key = new() { UseSystemPasswordChar = true };
+    private readonly CheckBox _mask = new() { Text = "マスク", Checked = true, AutoSize = true };
     private readonly TextBox _path = new();
     private readonly Label _free = new() { AutoSize = true };
     private readonly CheckBox _logon = new() { Text = "ログオン時起動", Checked = true, AutoSize = true };
@@ -67,7 +66,9 @@ public sealed class SetupForm : Form
         _jv.Location = DialogPx.P(16, 16);
         var keyLabel = new Label { Text = "利用キー", Location = DialogPx.P(16, 48), AutoSize = true };
         _key.Location = DialogPx.P(120, 44);
-        _key.Width = DialogPx.S(220);
+        _key.Width = DialogPx.S(180);
+        _mask.Location = DialogPx.P(308, 46);
+        _mask.CheckedChanged += (_, _) => _key.UseSystemPasswordChar = _mask.Checked;
         if (hasKey)
         {
             _key.PlaceholderText = "保存済み。変更するときだけ入力";
@@ -99,7 +100,7 @@ public sealed class SetupForm : Form
         };
         var saveButton = new Button { Text = "保存して完了", Location = DialogPx.P(320, 240), Size = DialogPx.Z(120, 28) };
         saveButton.Click += (_, _) => Save();
-        Controls.AddRange([_jv, keyLabel, _key, pathLabel, _path, browse, _free, _logon, note, saveButton]);
+        Controls.AddRange([_jv, keyLabel, _key, _mask, pathLabel, _path, browse, _free, _logon, note, saveButton]);
         ShowFree();
     }
 
@@ -144,6 +145,7 @@ public sealed class StatusForm : Form
     private readonly Func<ProgressSnapshot> _progress;
     private readonly Func<string?> _attention;
     private readonly Label _progressLabel = new() { AutoSize = false };
+    private readonly ProgressBar _progressBar = new();
     private readonly ListView _list = new() { View = View.Details, FullRowSelect = true, GridLines = true };
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
 
@@ -158,18 +160,21 @@ public sealed class StatusForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = DialogPx.Z(592, 380);
+        ClientSize = DialogPx.Z(592, 408);
         _progressLabel.Location = DialogPx.P(16, 12);
-        _progressLabel.Size = DialogPx.Z(560, 24);
-        _list.Location = DialogPx.P(16, 44);
-        _list.Size = DialogPx.Z(560, 280);
+        _progressLabel.Size = DialogPx.Z(560, 36);
+        _progressBar.Location = DialogPx.P(16, 52);
+        _progressBar.Size = DialogPx.Z(560, 18);
+        _list.Location = DialogPx.P(16, 80);
+        _list.Size = DialogPx.Z(560, 272);
         foreach (var column in new[] { "種類", "option", "どこまで", "最終結果", "件数", "次回" })
         {
             _list.Columns.Add(column, DialogPx.S(column == "種類" ? 150 : 80));
         }
 
-        var close = new Button { Text = "閉じる", Location = DialogPx.P(480, 340), Size = DialogPx.Z(96, 28), DialogResult = DialogResult.OK };
+        var close = new Button { Text = "閉じる", Location = DialogPx.P(480, 364), Size = DialogPx.Z(96, 28), DialogResult = DialogResult.OK };
         Controls.Add(_progressLabel);
+        Controls.Add(_progressBar);
         Controls.Add(_list);
         Controls.Add(close);
         _timer.Tick += (_, _) => RefreshRows();
@@ -180,20 +185,7 @@ public sealed class StatusForm : Form
 
     private void RefreshRows()
     {
-        var progress = _progress();
-        var attention = _attention();
-        if (!string.IsNullOrEmpty(attention))
-        {
-            _progressLabel.Text = attention;
-        }
-        else if (!string.IsNullOrEmpty(progress.Dataspec))
-        {
-            _progressLabel.Text = $"取得中   {DataspecCatalog.NameOf(progress.Dataspec)}   {progress.Status} / {progress.DownloadCount}";
-        }
-        else
-        {
-            _progressLabel.Text = "待機";
-        }
+        ProgressView.Apply(_progressLabel, _progressBar, _progress(), _attention());
 
         _list.BeginUpdate();
         _list.Items.Clear();
@@ -209,5 +201,88 @@ public sealed class StatusForm : Form
         }
 
         _list.EndUpdate();
+    }
+}
+
+static class ProgressView
+{
+    public static void Apply(Label label, ProgressBar bar, ProgressSnapshot progress, string? attention)
+    {
+        if (!string.IsNullOrEmpty(attention))
+        {
+            label.Text = attention;
+            SetBar(bar, 0, 0, active: false);
+            return;
+        }
+
+        label.Text = progress.Caption();
+        SetBar(bar, progress.Current, progress.Total, active: !string.IsNullOrEmpty(progress.Dataspec));
+    }
+
+    private static void SetBar(ProgressBar bar, int current, int total, bool active)
+    {
+        if (active && total <= 0)
+        {
+            bar.Style = ProgressBarStyle.Marquee;
+            bar.MarqueeAnimationSpeed = 30;
+            return;
+        }
+
+        var max = active ? total : 1;
+        var value = active ? Math.Clamp(current, 0, max) : 0;
+        bar.Style = ProgressBarStyle.Continuous;
+        bar.MarqueeAnimationSpeed = 0;
+        if (bar.Value > max)
+        {
+            bar.Value = 0;
+        }
+
+        bar.Maximum = max;
+        bar.Value = value;
+    }
+}
+
+public sealed class ImportProgressForm : Form
+{
+    private readonly Label _label = new() { AutoSize = false };
+    private readonly ProgressBar _bar = new();
+
+    public ImportProgressForm()
+    {
+        AutoScaleMode = AutoScaleMode.None;
+        Text = "取り込み";
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        StartPosition = FormStartPosition.Manual;
+        MaximizeBox = false;
+        MinimizeBox = true;
+        ShowInTaskbar = true;
+        ClientSize = DialogPx.Z(440, 132);
+        _label.Location = DialogPx.P(16, 16);
+        _label.Size = DialogPx.Z(408, 40);
+        _bar.Location = DialogPx.P(16, 60);
+        _bar.Size = DialogPx.Z(408, 18);
+        var note = new Label
+        {
+            AutoSize = false,
+            Text = "閉じても取り込みは続きます。",
+            Location = DialogPx.P(16, 88),
+            Size = DialogPx.Z(240, 24),
+        };
+        var close = new Button { Text = "閉じる", Location = DialogPx.P(328, 88), Size = DialogPx.Z(96, 28) };
+        close.Click += (_, _) => Close();
+        Controls.Add(_label);
+        Controls.Add(_bar);
+        Controls.Add(note);
+        Controls.Add(close);
+        CancelButton = close;
+    }
+
+    public void Apply(ProgressSnapshot progress) => ProgressView.Apply(_label, _bar, progress, null);
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        var area = Screen.FromControl(this).WorkingArea;
+        Location = new Point(area.Right - Width - DialogPx.S(16), area.Bottom - Height - DialogPx.S(16));
     }
 }

@@ -268,6 +268,87 @@ public class SessionTests
     }
 
     [Fact]
+    public void ImportProgressMovesThroughDownloadAndRead()
+    {
+        using var harness = new Harness();
+        var reports = new List<ProgressReport>();
+        var runner = new SessionRunner(
+            harness.Jv,
+            harness.Store,
+            harness.Store,
+            harness.Clock,
+            new ListLog(),
+            new NoDelay(),
+            progress: reports.Add);
+        harness.Jv.DownloadCount = 4;
+        harness.Jv.Statuses = new Queue<int>([1, 4]);
+        harness.Jv.ReadCount = 2;
+        harness.Jv.TotalReadKb = 1000;
+        harness.Jv.CurrentReadKb = 250;
+        var payload = Encoding.ASCII.GetBytes("RA" + new string('1', 20));
+        harness.Jv.Reads.Enqueue(Payloads.Data(payload, "RA.jvd"));
+        harness.Jv.Reads.Enqueue(new ReadResult(-1, null, "RA.jvd"));
+        harness.Jv.Reads.Enqueue(new ReadResult(0, null, null));
+        harness.Jv.OnRead = () => harness.Jv.CurrentReadKb = 800;
+        runner.Run(Stored("RACE"), "test-service-key", Path.Combine(harness.Root, "jvlink"), "20261102000000", CancellationToken.None);
+
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Download, Current: 1, Total: 4, Unit: "ファイル", Stored: true });
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 250, Total: 1000, Unit: "KB" });
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 800, Total: 1000, Unit: "KB" });
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 1000, Total: 1000, Unit: "KB" });
+        Assert.Equal(
+            "取得中   レース情報   読み込み   250 / 1000 KB   25%",
+            new ProgressSnapshot("RACE", ProgressPhase.Read, 250, 1000, "KB", true, 1).Caption());
+    }
+
+    [Fact]
+    public void ReadProgressUsesFileCountWhenSizeIsUnknown()
+    {
+        using var harness = new Harness();
+        var reports = new List<ProgressReport>();
+        var runner = new SessionRunner(
+            harness.Jv,
+            harness.Store,
+            harness.Store,
+            harness.Clock,
+            new ListLog(),
+            new NoDelay(),
+            progress: reports.Add);
+        harness.Jv.DownloadCount = 0;
+        harness.Jv.ReadCount = 2;
+        var payload = Encoding.ASCII.GetBytes("RA" + new string('2', 20));
+        harness.Jv.Reads.Enqueue(Payloads.Data(payload, "RA.jvd"));
+        harness.Jv.Reads.Enqueue(new ReadResult(-1, null, "RA.jvd"));
+        harness.Jv.Reads.Enqueue(new ReadResult(0, null, null));
+        runner.Run(Stored("RACE"), "test-service-key", Path.Combine(harness.Root, "jvlink"), "20261102000000", CancellationToken.None);
+
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 0, Total: 2, Unit: "ファイル" });
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 1, Total: 2, Unit: "ファイル" });
+        Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 2, Total: 2, Unit: "ファイル" });
+    }
+
+    [Fact]
+    public void CoordinatorClearsProgressWhenTheSessionEnds()
+    {
+        using var harness = new Harness();
+        harness.Jv.DownloadCount = 0;
+        harness.Jv.TotalReadKb = 80;
+        harness.Jv.CurrentReadKb = 20;
+        ProgressSnapshot? during = null;
+        harness.Jv.OnRead = () => during = harness.Coordinator.Progress;
+        harness.Jv.Reads.Enqueue(Payloads.Data(Encoding.ASCII.GetBytes("UM" + new string('B', 10)), "UM.jvd"));
+        harness.Jv.Reads.Enqueue(new ReadResult(0, null, null));
+        harness.Coordinator.Execute(Stored("DIFF"), CancellationToken.None);
+        Assert.NotNull(during);
+        Assert.Equal(ProgressPhase.Read, during.Phase);
+        Assert.Equal(20, during.Current);
+        Assert.Equal(80, during.Total);
+        Assert.True(during.Stored);
+        Assert.True(during.RunId > 0);
+        Assert.Null(harness.Coordinator.Progress.Dataspec);
+    }
+
+    [Fact]
     public void LowDiskStopsBeforeOpen()
     {
         using var harness = new Harness();

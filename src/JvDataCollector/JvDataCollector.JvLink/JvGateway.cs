@@ -18,7 +18,7 @@ public sealed class JvGateway : IJvGateway
     {
         _log = log;
         var type = Type.GetTypeFromProgID("JVDTLab.JVLink", throwOnError: false)
-            ?? throw new InvalidOperationException("64bit の JV-Link が登録されていません。");
+            ?? throw new InvalidOperationException("32bit の JV-Link が登録されていません。");
         _com = Activator.CreateInstance(type)
             ?? throw new InvalidOperationException("JV-Link を生成できません。");
     }
@@ -82,17 +82,23 @@ public sealed class JvGateway : IJvGateway
 
     public int DeleteFile(string fileName) => Call("JVFiledelete", [fileName]);
 
-    public string? CurrentFileTimeStamp()
+    public string? CurrentFileTimeStamp() => Property("m_CurrentFileTimeStamp") as string;
+
+    public int TotalReadFileSizeKb() => AsInt(Property("m_TotalReadFilesize"));
+
+    public int CurrentReadFileSizeKb() => AsInt(Property("m_CurrentReadFilesize"));
+
+    private object? Property(string name)
     {
         try
         {
             return _com.GetType().InvokeMember(
-                "m_CurrentFileTimeStamp",
+                name,
                 BindingFlags.GetProperty,
                 null,
                 _com,
                 null,
-                CultureInfo.InvariantCulture) as string;
+                CultureInfo.InvariantCulture);
         }
         catch (Exception ex)
         {
@@ -185,10 +191,13 @@ public sealed class JvGateway : IJvGateway
         }
         catch (Exception ex)
         {
-            _log.Error($"{name} {ex.GetType().Name}");
+            _log.Error($"{name} {FormatFailure(ex)}");
             return -1_000_002;
         }
     }
+
+    private static string FormatFailure(Exception ex) =>
+        ex is COMException com ? $"COMException 0x{com.HResult:X8}" : ex.GetType().Name;
 
     private static int AsInt(object? value) => value switch
     {

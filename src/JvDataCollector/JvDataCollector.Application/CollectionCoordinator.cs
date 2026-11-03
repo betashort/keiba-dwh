@@ -49,7 +49,50 @@ public sealed record StatusLine(
     int? Count,
     string Next);
 
-public sealed record ProgressSnapshot(string? Dataspec, int Status, int DownloadCount);
+public enum ProgressPhase
+{
+    Download,
+    Read,
+}
+
+public readonly record struct ProgressReport(
+    string Dataspec,
+    ProgressPhase Phase,
+    int Current,
+    int Total,
+    string Unit,
+    bool Stored);
+
+public sealed record ProgressSnapshot(
+    string? Dataspec,
+    ProgressPhase Phase,
+    int Current,
+    int Total,
+    string Unit,
+    bool Stored,
+    int RunId)
+{
+    public static ProgressSnapshot Idle { get; } = new(null, ProgressPhase.Download, 0, 0, "", false, 0);
+
+    public string Caption()
+    {
+        if (string.IsNullOrEmpty(Dataspec))
+        {
+            return "待機";
+        }
+
+        var name = DataspecCatalog.NameOf(Dataspec);
+        var phase = Phase == ProgressPhase.Download ? "ダウンロード" : "読み込み";
+        if (Total <= 0)
+        {
+            return $"取得中   {name}   {phase}";
+        }
+
+        var unit = string.IsNullOrEmpty(Unit) ? "" : " " + Unit;
+        var percent = (int)Math.Round(100d * Math.Clamp(Current, 0, Total) / Total);
+        return $"取得中   {name}   {phase}   {Current} / {Total}{unit}   {percent}%";
+    }
+}
 
 public sealed class CollectionCoordinator
 {
@@ -67,8 +110,10 @@ public sealed class CollectionCoordinator
     private HashSet<string> _rejected = [];
     private DateTimeOffset _lastOdds = DateTimeOffset.MinValue;
     private int _running;
+    private int _runId;
+    private int _activeRun;
     private bool _scheduleBlocked;
-    private ProgressSnapshot _progress = new(null, 0, 0);
+    private volatile ProgressSnapshot _progress = ProgressSnapshot.Idle;
 
     public CollectionCoordinator(
         IConfigStore configs,
@@ -223,6 +268,7 @@ public sealed class CollectionCoordinator
         }
 
         Volatile.Write(ref _running, 1);
+        _activeRun = Interlocked.Increment(ref _runId);
         try
         {
             Reload();
@@ -292,7 +338,7 @@ public sealed class CollectionCoordinator
         finally
         {
             Volatile.Write(ref _running, 0);
-            _progress = new ProgressSnapshot(null, 0, 0);
+            _progress = ProgressSnapshot.Idle;
         }
     }
 
@@ -506,8 +552,15 @@ public sealed class CollectionCoordinator
         return codes.OrderBy(code => rank.TryGetValue(code, out var index) ? index : int.MaxValue);
     }
 
-    private void ReportProgress(string dataspec, int status, int downloadCount) =>
-        _progress = new ProgressSnapshot(dataspec, status, downloadCount);
+    private void ReportProgress(ProgressReport report) =>
+        _progress = new ProgressSnapshot(
+            report.Dataspec,
+            report.Phase,
+            report.Current,
+            report.Total,
+            report.Unit,
+            report.Stored,
+            _activeRun);
 
     private static string AttentionText(int code) => code switch
     {

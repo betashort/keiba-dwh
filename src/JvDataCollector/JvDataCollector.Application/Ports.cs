@@ -89,6 +89,8 @@ public interface IJvGateway
     int Close();
     int DeleteFile(string fileName);
     string? CurrentFileTimeStamp();
+    int TotalReadFileSizeKb();
+    int CurrentReadFileSizeKb();
     void StartWatch(Action<RealtimeEventKind, string> onEvent);
     void StopWatch();
 }

@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace JvDataCollector;
 
 public sealed class MissingJv : IJvGateway
@@ -33,6 +35,10 @@ public sealed class MissingJv : IJvGateway
     public int DeleteFile(string fileName) => -201;
 
     public string? CurrentFileTimeStamp() => null;
+
+    public int TotalReadFileSizeKb() => 0;
+
+    public int CurrentReadFileSizeKb() => 0;
 
     public void StartWatch(Action<RealtimeEventKind, string> onEvent)
     {
@@ -190,7 +196,7 @@ public sealed class StaWorker : IDisposable
             Size = new Size(0, 0),
         };
         _pump.CreateControl();
-        if (JvRegistration.Is64BitRegistered)
+        if (JvRegistration.IsInstalled)
         {
             try
             {
@@ -198,7 +204,7 @@ public sealed class StaWorker : IDisposable
             }
             catch (Exception ex)
             {
-                _log.Error(ex.GetType().Name);
+                _log.Error(FormatFailure(ex));
                 _attention.Raise(AttentionReason.JvLinkMissing, "JV-Link を初期化できません。");
             }
         }
@@ -260,7 +266,7 @@ public sealed class StaWorker : IDisposable
         }
         catch (Exception ex)
         {
-            _log.Error(ex.GetType().Name);
+            _log.Error(FormatFailure(ex));
         }
 
         _pump.Dispose();
@@ -284,6 +290,9 @@ public sealed class StaWorker : IDisposable
             action();
         }
     }
+
+    private static string FormatFailure(Exception ex) =>
+        ex is COMException com ? $"COMException 0x{com.HResult:X8}" : ex.GetType().Name;
 
     private void ApplyWatch()
     {

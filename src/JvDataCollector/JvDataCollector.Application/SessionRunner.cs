@@ -29,7 +29,7 @@ public sealed class SessionRunner
     private readonly IAppLog _log;
     private readonly IDelay _delay;
     private readonly Action _pump;
-    private readonly Action<string, int, int> _progress;
+    private readonly Action<ProgressReport> _progress;
 
     public SessionRunner(
         IJvGateway jv,
@@ -39,7 +39,7 @@ public sealed class SessionRunner
         IAppLog log,
         IDelay delay,
         Action? pump = null,
-        Action<string, int, int>? progress = null)
+        Action<ProgressReport>? progress = null)
     {
         _jv = jv;
         _raw = raw;
@@ -203,7 +203,8 @@ public sealed class SessionRunner
                 return Failed(status);
             }
 
-            _progress(job.Dataspec, status, downloadCount);
+            var downloaded = downloadCount <= 0 ? 0 : Math.Clamp(status, 0, downloadCount);
+            Report(job, ProgressPhase.Download, downloaded, Math.Max(downloadCount, 0), "ファイル");
             if (downloadCount == 0 || status >= downloadCount)
             {
                 return null;
@@ -224,7 +225,9 @@ public sealed class SessionRunner
         var records = 0;
         var added = 0;
         var duplicates = 0;
+        var filesDone = skip;
         var sinceBoundary = new List<long>();
+        ReportRead(job, filesDone, opened.ReadCount, complete: false);
         while (true)
         {
             _pump();
@@ -278,6 +281,11 @@ public sealed class SessionRunner
                     _ledger.AttachOb14(generationId, id);
                 }
 
+                if (records % 32 == 0)
+                {
+                    ReportRead(job, filesDone, opened.ReadCount, complete: false);
+                }
+
                 continue;
             }
 
@@ -292,6 +300,7 @@ public sealed class SessionRunner
                 var timestamp = _jv.CurrentFileTimeStamp();
                 _ledger.AssignSource(sinceBoundary, read.FileName, timestamp);
                 sinceBoundary.Clear();
+                filesDone++;
                 if (job.Kind == JobKind.Stored)
                 {
                     if (job.Option == 4)
@@ -307,11 +316,13 @@ public sealed class SessionRunner
                         job.Option == 4 ? skip : 0);
                 }
 
+                ReportRead(job, filesDone, opened.ReadCount, complete: false);
                 continue;
             }
 
             if (read.Code == 0)
             {
+                ReportRead(job, filesDone, opened.ReadCount, complete: true);
                 return new SessionOutcome(
                     SessionOutcomeKind.Success,
                     0,
@@ -346,6 +357,30 @@ public sealed class SessionRunner
                 opened.DownloadCount,
                 opened.LastFileTimestamp);
         }
+    }
+
+    private void Report(CollectionJob job, ProgressPhase phase, int current, int total, string unit) =>
+        _progress(new ProgressReport(job.Dataspec, phase, current, total, unit, job.Kind == JobKind.Stored));
+
+    private void ReportRead(CollectionJob job, int filesDone, int readCount, bool complete)
+    {
+        var totalKb = _jv.TotalReadFileSizeKb();
+        if (totalKb > 0)
+        {
+            var currentKb = complete ? totalKb : Math.Clamp(_jv.CurrentReadFileSizeKb(), 0, totalKb);
+            Report(job, ProgressPhase.Read, currentKb, totalKb, "KB");
+            return;
+        }
+
+        if (readCount > 0)
+        {
+            var current = complete ? readCount : Math.Clamp(filesDone, 0, readCount);
+            Report(job, ProgressPhase.Read, current, readCount, "ファイル");
+            return;
+        }
+
+        var done = Math.Max(filesDone, 0);
+        Report(job, ProgressPhase.Read, done, complete && done > 0 ? done : 0, "ファイル");
     }
 
     private SessionOutcome Log(CollectionJob job, SessionOutcome outcome)

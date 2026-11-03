@@ -13,7 +13,7 @@
 
 ## 1. 結論
 
-収集アプリは、契約者本人の日本語版 Windows 11 に、管理者権限なしの自己完結フォルダとして置く。インストーラは使わない。公開単位は `win-x64` のディレクトリで、単一ファイルにはしない。.NET 10 デスクトップ ランタイムはフォルダに同梱する。
+収集アプリは、契約者本人の日本語版 Windows 11 に、管理者権限なしの自己完結フォルダとして置く。インストーラは使わない。公開単位は `win-x86` のディレクトリで、単一ファイルにはしない。.NET 10 デスクトップ ランタイムはフォルダに同梱する。
 
 インストール先は次の固定パスである。
 
@@ -21,7 +21,7 @@
 
 ログオン起動は、初回設定が `JvDataCollector.exe` のフルパスを `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に書く。設定、利用キー、生データ、台帳はインストール先の外にあり、差し替えでも削除でも触らない。
 
-前提は、利用者が別に入れた JV-Link 5.0.0 64bit だけである。JV-Link、利用キー、JV-Data は同梱しない。
+前提は、利用者が別に入れた公式の JV-Link 5.0.0 32bit だけである。JV-Link、利用キー、JV-Data は同梱しない。
 
 ## 2. 配置
 
@@ -64,13 +64,13 @@ $stage = Join-Path $env:TEMP "KeibaDwh.Collector.publish"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 dotnet publish src/JvDataCollector/JvDataCollector.Host/JvDataCollector.Host.csproj `
   -c Release `
-  -r win-x64 `
+  -r win-x86 `
   --self-contained true `
   -p:PublishSingleFile=false `
   -o $stage
 ```
 
-RID は `win-x64` だけとする。`PlatformTarget` は x64 のままである。`win-x86` と AnyCPU は公開しない。64bit の `JVDTLabLib.JVLink` と対にならない。
+RID は `win-x86` だけとする。`PlatformTarget` は x86 のままである。`win-x64` と AnyCPU は公開しない。公式の 32bit `JVDTLab.JVLink` と対にならない。
 
 自己完結にするのは、利用者に足す導入物を JV-Link だけにするためである。ランタイムの修正は、アプリを出し直してこのフォルダへ取り込む。デスクトップ ランタイムの別導入は前提にしない。
 
@@ -111,7 +111,7 @@ Start-Process (Join-Path $env:LOCALAPPDATA "Programs\KeibaDwh\Collector\JvDataCo
 
 ```mermaid
 flowchart TD
-  jv["JV-Link 5.0.0 64bit を入れ、規約に同意する"] --> publish["ステージへ公開する"]
+  jv["JV-Link 5.0.0 32bit を入れ、規約に同意する"] --> publish["ステージへ公開する"]
   publish --> copy["インストール先へコピーする"]
   copy --> run["JvDataCollector.exe を起動する"]
   run --> com{"COM は登録されているか"}
@@ -122,7 +122,7 @@ flowchart TD
   ready -->|はい| daily["定期取得を開始できる"]
 ```
 
-1. 利用者が JV-Link 5.0.0 64bit を入れ、利用規約に同意する。収集アプリはこれを同梱しない。COM が無い PC では取得を始めず、導入案内を出して止まる。
+1. 利用者が公式の JV-Link 5.0.0 32bit を入れ、利用規約に同意する。収集アプリはこれを同梱しない。COM が無い PC では取得を始めず、導入案内を出して止まる。
 2. [3. 公開](#3-公開) のコマンドでステージを作る。公開と次のコピーをまとめるときは、[手元のコマンド](#手元のコマンド) を使う。
 3. インストール先を作り、ステージの中身をコピーする。手元のコマンドを使ったときは、このコピーも済んでいる。
 
@@ -218,5 +218,5 @@ Run のパスは変えない。インストール先にバージョン番号の�
 | DP-05 | 更新は「終了」のあと、インストール先だけをミラーする。`%AppData%` と `DataRoot` は残す |
 | DP-06 | 削除もインストール先と Run の値だけである。生データと利用キーは残す |
 | DP-07 | アプリ自身の COM 登録はしない |
-| DP-08 | 公開 RID は `win-x64` だけである |
+| DP-08 | 公開 RID は `win-x86` だけである |
 | DP-09 | インストーラ、MSIX、ClickOnce、自動更新、署名、配信サーバは使わない |

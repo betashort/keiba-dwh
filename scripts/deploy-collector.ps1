@@ -4,7 +4,7 @@
     収集アプリを Release で公開し、ローカルのインストール先へミラーする。
 
 .DESCRIPTION
-    win-x64 の自己完結フォルダを %TEMP%\KeibaDwh.Collector.publish へ公開し、
+    win-x86 の自己完結フォルダを %TEMP%\KeibaDwh.Collector.publish へ公開し、
     %LocalAppData%\Programs\KeibaDwh\Collector だけを置き換える。
     実行中は通知領域の「終了」を待つ。プロセスは止めない。
     %AppData% と DataRoot は触らない。配置のあと exe は起動しない。
@@ -65,7 +65,7 @@ if (Test-Path -LiteralPath $stage) {
 
 & dotnet publish $project `
     -c Release `
-    -r win-x64 `
+    -r win-x86 `
     --self-contained true `
     -p:PublishSingleFile=false `
     -o $stage

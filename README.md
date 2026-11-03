@@ -18,7 +18,7 @@
 
 ```
 docs/                  要求、構造、設計
-src/JvDataCollector/   収集アプリ（C# / Windows Forms / x64 / net10.0-windows）
+src/JvDataCollector/   収集アプリ（C# / Windows Forms / x86 / net10.0-windows）
   JvDataCollector.Host          トレイ、状態、初回設定
   JvDataCollector.Application   スケジュール、セッション、水位
   JvDataCollector.JvLink        JV-Link の COM
@@ -30,7 +30,7 @@ src/JvDataCollector/   収集アプリ（C# / Windows Forms / x64 / net10.0-wind
 
 ## ビルド
 
-収集アプリは日本語版 Windows 11、.NET 10、JV-Link 5.0.0 の 64bit を前提にする。JV-Link は利用者が別に導入する。
+収集アプリは日本語版 Windows 11、.NET 10、公式の JV-Link 5.0.0（32bit）を前提にする。JV-Link は利用者が別に導入する。
 
 ```powershell
 dotnet build src/JvDataCollector/JvDataCollector.slnx

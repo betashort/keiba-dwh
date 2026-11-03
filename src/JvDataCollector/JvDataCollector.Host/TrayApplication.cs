@@ -14,6 +14,9 @@ public sealed class TrayApplication : ApplicationContext
     private readonly Icon _busy;
     private readonly Icon _alert;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
+    private ImportProgressForm? _progressForm;
+    private int _dismissedRun;
+    private bool _closingProgress;
 
     public TrayApplication(
         CollectionCoordinator coordinator,
@@ -148,7 +151,7 @@ public sealed class TrayApplication : ApplicationContext
     private bool EnsureReady()
     {
         var config = _configs.Load();
-        if (!JvRegistration.Is64BitRegistered)
+        if (!JvRegistration.IsInstalled)
         {
             using var guide = new GuideForm();
             guide.ShowDialog();
@@ -167,15 +170,15 @@ public sealed class TrayApplication : ApplicationContext
     public void ShowSetup()
     {
         var config = _configs.Load();
-        using var form = new SetupForm(config, _secrets.Exists, JvRegistration.Is64BitRegistered, SaveSetup);
+        using var form = new SetupForm(config, _secrets.Exists, JvRegistration.IsInstalled, SaveSetup);
         form.ShowDialog();
     }
 
     private string? SaveSetup(SetupInput input)
     {
-        if (!JvRegistration.Is64BitRegistered)
+        if (!JvRegistration.IsInstalled)
         {
-            return "64bit の JV-Link が入っていません。";
+            return "32bit の JV-Link が入っていません。";
         }
 
         if (!Directory.Exists(input.DataRoot))
@@ -202,9 +205,12 @@ public sealed class TrayApplication : ApplicationContext
         var code = _worker.ApplyConnection(Path.Combine(input.DataRoot, "jvlink"), key);
         if (code != 0)
         {
-            return code == -101
-                ? "利用キーは登録済みです。変更には JV-Link の再インストールが必要です。"
-                : $"JV-Link の設定に失敗しました（{code}）。";
+            return code switch
+            {
+                -101 => "利用キーは登録済みです。変更には JV-Link の再インストールが必要です。",
+                -201 => "JV-Link を初期化できません。",
+                _ => $"JV-Link の設定に失敗しました（{code}）。",
+            };
         }
 
         _worker.Invoke(() => _store.Reopen(input.DataRoot));
@@ -234,7 +240,9 @@ public sealed class TrayApplication : ApplicationContext
 
     private void UpdateIcon()
     {
-        if (_attention.HasAttention || !JvRegistration.Is64BitRegistered)
+        var progress = _coordinator.Progress;
+        ShowImport(progress);
+        if (_attention.HasAttention || !JvRegistration.IsInstalled)
         {
             _icon.Icon = _alert;
             _icon.Text = "要対応";
@@ -244,7 +252,7 @@ public sealed class TrayApplication : ApplicationContext
         if (_coordinator.IsBusy(DateTimeOffset.UtcNow))
         {
             _icon.Icon = _busy;
-            _icon.Text = "取得中";
+            _icon.Text = Tip(string.IsNullOrEmpty(progress.Dataspec) ? "取得中" : progress.Caption());
             return;
         }
 
@@ -252,8 +260,63 @@ public sealed class TrayApplication : ApplicationContext
         _icon.Text = "待機";
     }
 
+    private void ShowImport(ProgressSnapshot progress)
+    {
+        var visible = progress.Stored && !string.IsNullOrEmpty(progress.Dataspec);
+        if (!visible)
+        {
+            CloseProgress();
+            return;
+        }
+
+        if (_dismissedRun == progress.RunId)
+        {
+            return;
+        }
+
+        if (_progressForm is null || _progressForm.IsDisposed)
+        {
+            _progressForm = new ImportProgressForm();
+            _progressForm.FormClosed += (_, _) =>
+            {
+                if (!_closingProgress && _coordinator.Progress.RunId != 0)
+                {
+                    _dismissedRun = _coordinator.Progress.RunId;
+                }
+
+                _progressForm = null;
+            };
+            _progressForm.Show();
+        }
+
+        _progressForm.Apply(progress);
+    }
+
+    private void CloseProgress()
+    {
+        if (_progressForm is not { IsDisposed: false })
+        {
+            _progressForm = null;
+            return;
+        }
+
+        _closingProgress = true;
+        try
+        {
+            _progressForm.Close();
+        }
+        finally
+        {
+            _closingProgress = false;
+            _progressForm = null;
+        }
+    }
+
+    private static string Tip(string text) => text.Length <= 63 ? text : text[..63];
+
     private void Exit()
     {
+        CloseProgress();
         _coordinator.RequestShutdown();
         _worker.Dispose();
         _icon.Visible = false;

@@ -12,7 +12,7 @@
 
 一式は、同じ契約者の PC で動く。収集アプリと DWH ローダは別プロセスである。予想の実行は、そのどちらにも入らない。予想を起動するプロセスの置き方は未決である。
 
-収集アプリは、ログオン セッションの C# / Windows Forms トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`、プロセスは x64。JV-Link から届いたバイト列を raw に追記し、水位と索引を SQLite に書く。PostgreSQL には接続しない。
+収集アプリは、ログオン セッションの C# / Windows Forms トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`、プロセスは x86。JV-Link から届いたバイト列を raw に追記し、水位と索引を SQLite に書く。PostgreSQL には接続しない。
 
 DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。利用者はそのたび起動しない。JV-Link は呼ばない。予想モデルは起動しない。
 
@@ -24,7 +24,7 @@ DWH ローダは別プロセスである。完了した raw の更新と、そ�
 flowchart LR
   user["契約者"]
   app["収集アプリ"]
-  jvlink["JV-Link 5.0.0 64bit"]
+  jvlink["JV-Link 5.0.0 32bit"]
   server["Data Lab. サーバ"]
   disk["ランディング"]
   loader["DWH ローダ"]
@@ -106,7 +106,7 @@ PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/wareh
 
 | 項目 | 決定 | 詳細 |
 | --- | --- | --- |
-| 収集アプリ | C#、Windows Forms、x64、`net10.0-windows` | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) |
+| 収集アプリ | C#、Windows Forms、x86、`net10.0-windows` | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) |
 | 収集の台帳 | SQLite。WAL。アプリとローダが同時に読める | 同上 |
 | 生データ | 追記フレーム。文字コード変換と項目分割をしない | [jv-data-collector/design.md](jv-data-collector/design.md) |
 | 倉庫 | PostgreSQL。ライセンスは PostgreSQL License | [dwh-loader/warehouse.md](dwh-loader/warehouse.md) |

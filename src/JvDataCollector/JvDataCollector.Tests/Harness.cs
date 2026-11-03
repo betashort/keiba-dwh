@@ -68,6 +68,10 @@ public sealed class FakeJv : IJvGateway
     public int RtCode { get; set; }
     public string LastTimestamp { get; set; } = "20261102120000";
     public int DownloadCount { get; set; } = 1;
+    public int ReadCount { get; set; } = 1;
+    public int TotalReadKb { get; set; }
+    public int CurrentReadKb { get; set; }
+    public Queue<int>? Statuses { get; set; }
     public string? FileStamp { get; set; } = "20261102090000";
     public Queue<ReadResult> Reads { get; } = new();
     public List<string> Calls { get; } = [];
@@ -98,7 +102,7 @@ public sealed class FakeJv : IJvGateway
     public OpenResult Open(string dataspec, string fromTime, int option)
     {
         Calls.Add("open");
-        return new OpenResult(OpenCode, 1, DownloadCount, LastTimestamp);
+        return new OpenResult(OpenCode, ReadCount, DownloadCount, LastTimestamp);
     }
 
     public OpenResult RtOpen(string dataspec, string key)
@@ -107,7 +111,7 @@ public sealed class FakeJv : IJvGateway
         return new OpenResult(RtCode, 0, 0, null);
     }
 
-    public int Status() => DownloadCount;
+    public int Status() => Statuses is { Count: > 0 } ? Statuses.Dequeue() : DownloadCount;
 
     public ReadResult Read()
     {
@@ -133,6 +137,10 @@ public sealed class FakeJv : IJvGateway
     }
 
     public string? CurrentFileTimeStamp() => FileStamp;
+
+    public int TotalReadFileSizeKb() => TotalReadKb;
+
+    public int CurrentReadFileSizeKb() => CurrentReadKb;
 
     public void StartWatch(Action<RealtimeEventKind, string> onEvent)
     {
