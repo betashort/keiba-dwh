@@ -97,7 +97,11 @@ RID は `win-x64` だけとする。`PlatformTarget` は x64 のままである�
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-collector.ps1
 ```
 
-スクリプトは、この節の `dotnet publish` と [4. 初回](#4-初回) の `robocopy /MIR` を順に行う。`dotnet build` の出力はコピーしない。ステージは `%TEMP%\KeibaDwh.Collector.publish` である。コピー先はインストール先だけである。`%AppData%` と `DataRoot` は対象にしない。配置のあと、スクリプトは exe を起動しない。
+スクリプトは、この節の `dotnet publish` と [4. 初回](#4-初回) の `robocopy /MIR` を順に行う。`dotnet build` の出力はコピーしない。ステージは `%TEMP%\KeibaDwh.Collector.publish` である。コピー先はインストール先だけである。`%AppData%` と `DataRoot` は対象にしない。配置のあと、スクリプトは exe を起動しない。起動は次である。
+
+```powershell
+Start-Process (Join-Path $env:LOCALAPPDATA "Programs\KeibaDwh\Collector\JvDataCollector.exe")
+```
 
 `JvDataCollector` という名前のプロセスが実行中のときは、通知領域の「終了」を待つ。プロセスは止めない。待ちをやめるときは Ctrl+C でスクリプトを止める。終了したあとに公開を始める。ファイルがロックされたままのときは、再試行 2 回のあと失敗で終わる。
 
@@ -130,7 +134,11 @@ robocopy $stage $dest /MIR
 
 `robocopy` の終了コード 0 から 7 はコピー成功である。8 以上は失敗である。
 
-4. `JvDataCollector.exe` を起動する。作業ディレクトリはインストール先とは限らない。初回設定が利用キー、存在する保存先、ログオン起動を揃えるまで、定期取得は始まらない。取得する種類と時刻は標準のスケジュールで始まり、メニューの「蓄積データ」と「開催日の速報」で変える。
+4. 次で `JvDataCollector.exe` を起動する。作業ディレクトリはインストール先とは限らない。初回設定が利用キー、存在する保存先、ログオン起動を揃えるまで、定期取得は始まらない。取得する種類と時刻は標準のスケジュールで始まり、メニューの「蓄積データ」と「開催日の速報」で変える。
+
+```powershell
+Start-Process (Join-Path $env:LOCALAPPDATA "Programs\KeibaDwh\Collector\JvDataCollector.exe")
+```
 5. Run に書く値は、バージョンを含まない次のフルパスである。
 
 `%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe`
@@ -154,7 +162,7 @@ flowchart TD
 1. 「終了」で常駐を終える。スクリプトを先に起動したときは、スクリプトがこの終了を待つ。
 2. [手元のコマンド](#手元のコマンド) を実行する。公開とミラーを分けて行うときは、[3. 公開](#3-公開) のあと、次のコピーを行う。
 3. [4. 初回](#4-初回) と同じ `robocopy $stage $dest /MIR` で、インストール先だけを置き換える。`%AppData%` と `DataRoot` は対象にしない。手元のコマンドを使ったときは、このコピーも済んでいる。
-4. 同じ exe パスから起動する。水位と `service-key.bin` はそのまま続きになる。
+4. [手元のコマンド](#手元のコマンド) と同じ起動コマンドで、同じ exe パスから起動する。水位と `service-key.bin` はそのまま続きになる。
 
 Run のパスは変えない。インストール先にバージョン番号のディレクトリを挟まない。
 

@@ -3,11 +3,7 @@
 - 状態: ドラフト
 - 日付: 2026-11-03
 - 対象: 契約者本人が、この PC で収集アプリを入れて、動かし、止める手順
-- 要求: [requirements.md](requirements.md)
-- 構造: [architecture.md](architecture.md)
-- 設計: [design.md](design.md)
-- デプロイ: [deployment.md](deployment.md)
-- 位置づけ: 操作の手順。取得の定義、保存形式、プロセス分割の正本は上の文書。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- 位置づけ: 操作の手順。レコードのバイト定義は [公式の資料](#14-公式の資料) を正とし、ここでは再定義しない。
 
 ## 1. このアプリがすること
 
@@ -61,9 +57,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-collector.p
 
 スクリプトは配置のあと exe を起動しない。エクスプローラからこの exe を起動する。すでに常駐しているときは、もう一度起動しても画面は出ない。通知領域のアイコンを使う。
 
-開発中の `dotnet run` や `bin\Debug` から初期設定を完了しない。ログオン時起動には、そのとき起動していた exe のパスが登録される。
-
-配置、更新、削除の決定は [deployment.md](deployment.md)。
+開発中の `dotnet run` や `bin\Debug` から初期設定を完了しない。ログオン時起動には、そのとき起動していた exe のパスが登録される。更新は [11. 更新](#11-更新)、削除は [12. 終了、移動、削除](#12-終了移動削除)。
 
 ## 4. 初期設定
 
@@ -364,13 +358,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-collector.p
 
 ログオン時起動を外すときは、「終了」のあと、Run の値名 `KeibaDwh.Collector` を削除する。初期設定を保存すると、また登録される。
 
-## 14. 詳しい文書
+## 14. 公式の資料
 
-| 知りたいこと | 文書 |
-| --- | --- |
-| 何を残し、何を残さないか | [requirements.md](requirements.md) |
-| プロセス、スレッド、障害時の境界 | [architecture.md](architecture.md) |
-| 取得手順、対象データ、保存形式、受入条件 | [design.md](design.md) |
-| 公開コマンド、インストール先、更新、削除の決定 | [deployment.md](deployment.md) |
-| 完了した生データを PostgreSQL へ載せる仕事 | [../dwh-loader/requirements.md](../dwh-loader/requirements.md) |
-| 公式のバイト定義 | [JV-Data 仕様書](https://jra-van.jp/dlb/sdv/sdk/JV-Data4901.pdf)、[JV-Link インターフェース仕様書](https://jra-van.jp/dlb/sdv/sdk/JV-Link4901.pdf) |
+導入、レコードのバイト定義、メソッドと戻り値は、公開されている次の資料を正とする。このマニュアルでは再定義しない。
+
+| 資料 | 版 | 知りたいこと |
+| --- | --- | --- |
+| [SDK 5.0.0（64bit）](https://jra-van.jp/dlb/sdv/sdk.html) | 2026-08-04 | JV-Link の導入。32bit 版だけでは動かない |
+| [開発ガイド](https://jra-van.jp/dlb/sdv/sdk/DataLab423.pdf) | 第4.2.3版（2026-07-31） | 動作環境、蓄積の取得の流れ |
+| [JV-Data 仕様書](https://jra-van.jp/dlb/sdv/sdk/JV-Data4901.pdf) | 4.9.0.1（2024-08-07） | レコードの並び、コード、データ種別 |
+| [JV-Link インターフェース仕様書](https://jra-van.jp/dlb/sdv/sdk/JV-Link4901.pdf) | 4.9.0.1（2024-08-07） | メソッド、戻り値 |
+
+仕様の改訂は [ドキュメント更新履歴](https://developer.jra-van.jp/t/topic/459) を見る。
