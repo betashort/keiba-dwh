@@ -215,7 +215,7 @@ static class ProgressView
             return;
         }
 
-        label.Text = progress.Caption();
+        label.Text = progress.Caption(DateTimeOffset.UtcNow);
         SetBar(bar, progress.Current, progress.Total, active: !string.IsNullOrEmpty(progress.Dataspec));
     }
 

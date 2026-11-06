@@ -259,7 +259,7 @@ public sealed class TrayApplication : ApplicationContext
         if (_coordinator.IsBusy(DateTimeOffset.UtcNow))
         {
             _icon.Icon = _busy;
-            _icon.Text = Tip(string.IsNullOrEmpty(progress.Dataspec) ? "取得中" : progress.Caption());
+            _icon.Text = Tip(string.IsNullOrEmpty(progress.Dataspec) ? "取得中" : progress.Caption(DateTimeOffset.UtcNow));
             return;
         }
 

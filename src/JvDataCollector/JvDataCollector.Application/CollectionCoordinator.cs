@@ -70,11 +70,32 @@ public sealed record ProgressSnapshot(
     int Total,
     string Unit,
     bool Stored,
-    int RunId)
+    int RunId,
+    DateTimeOffset StartedAt,
+    int Baseline)
 {
-    public static ProgressSnapshot Idle { get; } = new(null, ProgressPhase.Download, 0, 0, "", false, 0);
+    public static ProgressSnapshot Idle { get; } = new(null, ProgressPhase.Download, 0, 0, "", false, 0, default, 0);
 
-    public string Caption()
+    public ProgressSnapshot Follow(ProgressReport report, int runId, DateTimeOffset now)
+    {
+        var same = Dataspec == report.Dataspec
+            && Phase == report.Phase
+            && Unit == report.Unit
+            && RunId == runId
+            && report.Current >= Baseline;
+        return new ProgressSnapshot(
+            report.Dataspec,
+            report.Phase,
+            report.Current,
+            report.Total,
+            report.Unit,
+            report.Stored,
+            runId,
+            same ? StartedAt : now,
+            same ? Baseline : report.Current);
+    }
+
+    public string Caption(DateTimeOffset now)
     {
         if (string.IsNullOrEmpty(Dataspec))
         {
@@ -85,12 +106,36 @@ public sealed record ProgressSnapshot(
         var phase = Phase == ProgressPhase.Download ? "ダウンロード" : "読み込み";
         if (Total <= 0)
         {
-            return $"取得中   {name}   {phase}";
+            return $"取得中   {name}   {phase}   計測中";
         }
 
         var unit = string.IsNullOrEmpty(Unit) ? "" : " " + Unit;
         var percent = (int)Math.Round(100d * Math.Clamp(Current, 0, Total) / Total);
-        return $"取得中   {name}   {phase}   {Current} / {Total}{unit}   {percent}%";
+        return $"取得中   {name}   {phase}   {Current} / {Total}{unit}   {percent}%   {Remaining(now)}";
+    }
+
+    private string Remaining(DateTimeOffset now)
+    {
+        if (Current >= Total)
+        {
+            return "あと 1 分未満";
+        }
+
+        var gained = Current - Baseline;
+        var elapsed = now - StartedAt;
+        if (gained <= 0 || elapsed < TimeSpan.FromSeconds(3))
+        {
+            return "計測中";
+        }
+
+        var seconds = (Total - Current) * elapsed.TotalSeconds / gained;
+        if (seconds < 60)
+        {
+            return "あと 1 分未満";
+        }
+
+        var minutes = (int)Math.Round(seconds / 60, MidpointRounding.AwayFromZero);
+        return $"あと {minutes} 分";
     }
 }
 
@@ -570,14 +615,7 @@ public sealed class CollectionCoordinator
     }
 
     private void ReportProgress(ProgressReport report) =>
-        _progress = new ProgressSnapshot(
-            report.Dataspec,
-            report.Phase,
-            report.Current,
-            report.Total,
-            report.Unit,
-            report.Stored,
-            _activeRun);
+        _progress = _progress.Follow(report, _activeRun, _clock.UtcNow);
 
     private static string AttentionText(int code) => code switch
     {

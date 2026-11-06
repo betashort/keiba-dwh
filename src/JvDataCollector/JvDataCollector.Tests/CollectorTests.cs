@@ -297,9 +297,46 @@ public class SessionTests
         Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 250, Total: 1000, Unit: "KB" });
         Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 800, Total: 1000, Unit: "KB" });
         Assert.Contains(reports, item => item is { Phase: ProgressPhase.Read, Current: 1000, Total: 1000, Unit: "KB" });
+        var started = new DateTimeOffset(2026, 11, 6, 13, 0, 0, TimeSpan.Zero);
         Assert.Equal(
-            "取得中   レース情報   読み込み   250 / 1000 KB   25%",
-            new ProgressSnapshot("RACE", ProgressPhase.Read, 250, 1000, "KB", true, 1).Caption());
+            "取得中   レース情報   読み込み   250 / 1000 KB   25%   計測中",
+            new ProgressSnapshot("RACE", ProgressPhase.Read, 250, 1000, "KB", true, 1, started, 250).Caption(started));
+    }
+
+    [Fact]
+    public void RemainingTimeUsesTheCurrentPhaseRate()
+    {
+        var started = new DateTimeOffset(2026, 11, 6, 13, 0, 0, TimeSpan.Zero);
+        var reading = new ProgressSnapshot("RACE", ProgressPhase.Read, 250, 1000, "KB", true, 1, started, 0);
+        Assert.Equal(
+            "取得中   レース情報   読み込み   250 / 1000 KB   25%   計測中",
+            reading.Caption(started.AddSeconds(2)));
+        Assert.Equal(
+            "取得中   レース情報   読み込み   250 / 1000 KB   25%   あと 2 分",
+            reading.Caption(started.AddSeconds(30)));
+        Assert.Equal(
+            "取得中   レース情報   読み込み   250 / 1000 KB   25%   あと 1 分未満",
+            reading.Caption(started.AddSeconds(10)));
+        Assert.Equal(
+            "取得中   レース情報   読み込み   1000 / 1000 KB   100%   あと 1 分未満",
+            (reading with { Current = 1000 }).Caption(started.AddSeconds(30)));
+        Assert.Equal(
+            "取得中   レース情報   ダウンロード   計測中",
+            new ProgressSnapshot("RACE", ProgressPhase.Download, 0, 0, "ファイル", true, 1, started, 0).Caption(started));
+
+        var cold = reading.Follow(new ProgressReport("RACE", ProgressPhase.Download, 1, 4, "ファイル", true), 1, started.AddMinutes(1));
+        Assert.Equal(started.AddMinutes(1), cold.StartedAt);
+        Assert.Equal(1, cold.Baseline);
+        Assert.Equal(
+            "取得中   レース情報   ダウンロード   1 / 4 ファイル   25%   計測中",
+            cold.Caption(started.AddMinutes(1)));
+
+        var later = cold.Follow(new ProgressReport("RACE", ProgressPhase.Download, 2, 4, "ファイル", true), 1, started.AddMinutes(1).AddSeconds(30));
+        Assert.Equal(cold.StartedAt, later.StartedAt);
+        Assert.Equal(1, later.Baseline);
+        Assert.Equal(
+            "取得中   レース情報   ダウンロード   2 / 4 ファイル   50%   あと 1 分",
+            later.Caption(started.AddMinutes(1).AddSeconds(30)));
     }
 
     [Fact]
