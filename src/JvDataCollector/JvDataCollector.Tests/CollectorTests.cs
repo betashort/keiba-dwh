@@ -67,6 +67,25 @@ public class LandingTests
     }
 
     [Fact]
+    public void RepairLeavesCompletedFileUntouched()
+    {
+        using var harness = new Harness();
+        var payload = Encoding.ASCII.GetBytes("UM" + new string('B', 20));
+        harness.Store.Append("DIFF", harness.Clock.UtcNow, payload);
+        harness.Store.Repair(RecordKeys.Classify);
+        harness.Store.CompleteDataspec("DIFF");
+        var file = Directory.EnumerateFiles(Path.Combine(harness.Root, "raw"), "*.bin", SearchOption.AllDirectories).Single();
+        var original = File.ReadAllBytes(file);
+        File.AppendAllText(file, "TAIL");
+        harness.Store.Repair(RecordKeys.Classify);
+        var kept = File.ReadAllBytes(file);
+        Assert.Equal(original.Length + 4, kept.Length);
+        Assert.Equal(original, kept[..original.Length]);
+        Assert.Equal(Encoding.ASCII.GetBytes("TAIL"), kept[original.Length..]);
+        Assert.Equal(1, Payloads.Published(harness.Store.LedgerPath, "DIFF"));
+    }
+
+    [Fact]
     public void RotationCompletesTheFullFile()
     {
         using var harness = new Harness(maxFileBytes: 80);

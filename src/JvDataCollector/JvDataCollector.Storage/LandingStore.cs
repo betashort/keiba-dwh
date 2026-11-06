@@ -10,6 +10,7 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
     public const string ActiveOb14View = "ob14_active";
 
     private readonly object _gate = new();
+    private readonly object _repairGate = new();
     private SqliteConnection _connection;
     private string _root;
     private readonly long _maxFileBytes;
@@ -49,31 +50,35 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
 
     public void Reopen(string dataRoot)
     {
-        lock (_gate)
+        lock (_repairGate)
         {
-            if (string.Equals(_root, dataRoot, StringComparison.OrdinalIgnoreCase))
+            lock (_gate)
             {
-                return;
+                if (string.Equals(_root, dataRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                DiscardWriteBatchUnlocked();
+                CloseStream();
+                _connection.Dispose();
+                _root = dataRoot;
+                Directory.CreateDirectory(Path.Combine(_root, "jvlink"));
+                Directory.CreateDirectory(Path.Combine(_root, "raw"));
+                Directory.CreateDirectory(Path.Combine(_root, "state"));
+                var path = Path.Combine(_root, "state", "ledger.sqlite");
+                _connection = new SqliteConnection($"Data Source={path};Mode=ReadWriteCreate;Cache=Shared");
+                _connection.Open();
+                using var pragma = _connection.CreateCommand();
+                pragma.CommandText = "PRAGMA journal_mode=WAL;";
+                pragma.ExecuteScalar();
+                using var rest = _connection.CreateCommand();
+                rest.CommandText = "PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;";
+                rest.ExecuteNonQuery();
+                CreateSchema();
             }
 
-            DiscardWriteBatchUnlocked();
-            CloseStream();
-            _connection.Dispose();
-            _root = dataRoot;
-            Directory.CreateDirectory(Path.Combine(_root, "jvlink"));
-            Directory.CreateDirectory(Path.Combine(_root, "raw"));
-            Directory.CreateDirectory(Path.Combine(_root, "state"));
-            var path = Path.Combine(_root, "state", "ledger.sqlite");
-            _connection = new SqliteConnection($"Data Source={path};Mode=ReadWriteCreate;Cache=Shared");
-            _connection.Open();
-            using var pragma = _connection.CreateCommand();
-            pragma.CommandText = "PRAGMA journal_mode=WAL;";
-            pragma.ExecuteScalar();
-            using var rest = _connection.CreateCommand();
-            rest.CommandText = "PRAGMA busy_timeout=5000; PRAGMA foreign_keys=ON;";
-            rest.ExecuteNonQuery();
-            CreateSchema();
-            Repair(RecordKeys.Classify);
+            RepairIncomplete(RecordKeys.Classify);
         }
     }
 
@@ -187,18 +192,34 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
 
     public void Repair(Func<ReadOnlySpan<byte>, FrameClassification> classify)
     {
+        lock (_repairGate)
+        {
+            RepairIncomplete(classify);
+        }
+    }
+
+    private void RepairIncomplete(Func<ReadOnlySpan<byte>, FrameClassification> classify)
+    {
+        foreach (var file in IncompleteFiles())
+        {
+            RepairOpenFile(file, classify);
+        }
+    }
+
+    private List<OpenRaw> IncompleteFiles()
+    {
         lock (_gate)
         {
-            var root = Path.Combine(_root, "raw");
-            if (!Directory.Exists(root))
+            using var command = NewCommand();
+            command.CommandText = "SELECT id, path, dataspec FROM raw_file WHERE complete=0";
+            var files = new List<OpenRaw>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                return;
+                files.Add(new OpenRaw(reader.GetInt64(0), reader.GetString(1), reader.GetString(2)));
             }
 
-            foreach (var path in Directory.EnumerateFiles(root, "*.bin", SearchOption.AllDirectories))
-            {
-                RepairFile(path, classify);
-            }
+            return files;
         }
     }
 
@@ -582,45 +603,66 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
         }
     }
 
-    private void RepairFile(string path, Func<ReadOnlySpan<byte>, FrameClassification> classify)
+    private void RepairOpenFile(OpenRaw file, Func<ReadOnlySpan<byte>, FrameClassification> classify)
     {
-        if (!RawFrameCodec.StartsWithMagic(path))
+        if (!RawFrameCodec.StartsWithMagic(file.Path))
         {
-            _log.Info($"repair skip path={path}");
+            _log.Info($"repair skip path={file.Path}");
             return;
         }
 
-        var dataspec = DataspecFromPath(path);
-        var frames = new List<(long Sequence, long Offset, int Length, byte[] Hash, byte[] Payload)>();
-        using (var stream = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
+        var known = KnownSequences(file.Id);
+        long validLength = 0;
+        long lastSeq = 0;
+        using (var stream = new FileStream(file.Path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
         {
             while (RawFrameCodec.TryRead(stream, out var sequence, out var offset, out var length, out var hash, out var payload))
             {
-                frames.Add((sequence, offset, length, hash, payload));
+                validLength = stream.Position;
+                lastSeq = sequence;
+                if (known.Contains(sequence))
+                {
+                    continue;
+                }
+
+                IndexMissing(file, sequence, offset, length, hash, classify(payload));
             }
 
-            var validLength = stream.Position;
-            var complete = IsComplete(path);
-            if (!complete && stream.Length != validLength)
+            if (stream.Length != validLength)
             {
                 stream.SetLength(validLength);
-                _log.Info($"repair truncate path={path} length={validLength}");
+                _log.Info($"repair truncate path={file.Path} length={validLength}");
             }
         }
 
-        var fileId = EnsureFileRow(path, dataspec, new FileInfo(path).Length, frames.Count == 0 ? 0 : frames[^1].Sequence, IsComplete(path));
-        Execute("DELETE FROM record_index WHERE file_id=$f AND offset>=$n", ("$f", fileId), ("$n", new FileInfo(path).Length));
-        foreach (var frame in frames)
+        CommitRepair(file.Id, validLength, lastSeq);
+    }
+
+    private HashSet<long> KnownSequences(long fileId)
+    {
+        lock (_gate)
         {
-            if (FindBySequence(fileId, frame.Sequence))
+            using var command = NewCommand();
+            command.CommandText = "SELECT seq FROM record_index WHERE file_id=$f";
+            Add(command, ("$f", fileId));
+            var known = new HashSet<long>();
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                continue;
+                known.Add(reader.GetInt64(0));
             }
 
-            var classified = classify(frame.Payload);
-            if (FindByHashUnlocked(dataspec, frame.Hash) is not null)
+            return known;
+        }
+    }
+
+    private void IndexMissing(OpenRaw file, long sequence, long offset, int length, byte[] hash, FrameClassification classified)
+    {
+        lock (_gate)
+        {
+            if (FindBySequence(file.Id, sequence) || FindByHashUnlocked(file.Dataspec, hash) is not null)
             {
-                continue;
+                return;
             }
 
             using var command = NewCommand();
@@ -630,16 +672,32 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
                 VALUES ($d, $r, $h, $f, $s, $o, $n, $t)
                 """;
             Add(command,
-                ("$d", dataspec),
+                ("$d", file.Dataspec),
                 ("$r", classified.RecordId),
-                ("$f", fileId),
-                ("$s", frame.Sequence),
-                ("$o", frame.Offset),
-                ("$n", frame.Length),
+                ("$f", file.Id),
+                ("$s", sequence),
+                ("$o", offset),
+                ("$n", length),
                 ("$t", Stamp(DateTimeOffset.UtcNow)));
-            command.Parameters.Add("$h", SqliteType.Blob).Value = frame.Hash;
+            command.Parameters.Add("$h", SqliteType.Blob).Value = hash;
             command.ExecuteNonQuery();
             RememberKeys(classified.MeetingDay, classified.RaceKey);
+        }
+    }
+
+    private void CommitRepair(long fileId, long length, long lastSeq)
+    {
+        lock (_gate)
+        {
+            Execute(
+                "UPDATE raw_file SET byte_length=$n, last_seq=$s WHERE id=$id",
+                ("$n", length),
+                ("$s", lastSeq),
+                ("$id", fileId));
+            Execute(
+                "DELETE FROM record_index WHERE file_id=$f AND offset>=$n",
+                ("$f", fileId),
+                ("$n", length));
         }
     }
 
@@ -754,14 +812,6 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
         }
 
         return EnsureFileRow(path, dataspec, new FileInfo(path).Length, 0, false);
-    }
-
-    private bool IsComplete(string path)
-    {
-        using var command = NewCommand();
-        command.CommandText = "SELECT complete FROM raw_file WHERE path=$p";
-        Add(command, ("$p", path));
-        return command.ExecuteScalar() is long value && value == 1;
     }
 
     private bool FindBySequence(long fileId, long sequence)
@@ -939,13 +989,6 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
     private static string Stamp(DateTimeOffset utc) =>
         utc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
-    private static string DataspecFromPath(string path)
-    {
-        var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var raw = Array.IndexOf(parts, "raw");
-        return raw >= 0 && raw + 1 < parts.Length ? parts[raw + 1] : "";
-    }
-
     private static bool PathMatchesDay(string path, DateOnly day)
     {
         var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -1066,6 +1109,8 @@ public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
             """;
         command.ExecuteNonQuery();
     }
+
+    private readonly record struct OpenRaw(long Id, string Path, string Dataspec);
 
     private sealed record FileRow(long Id, string Path, long Length, long LastSeq);
 }
