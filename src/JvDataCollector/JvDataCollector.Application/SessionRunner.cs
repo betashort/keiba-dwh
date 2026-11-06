@@ -30,6 +30,7 @@ public sealed class SessionRunner
     private readonly IDelay _delay;
     private readonly Action _pump;
     private readonly Action<ProgressReport> _progress;
+    private readonly IWriteBatch? _writes;
 
     public SessionRunner(
         IJvGateway jv,
@@ -49,6 +50,7 @@ public sealed class SessionRunner
         _delay = delay;
         _pump = pump ?? delegate { };
         _progress = progress ?? delegate { };
+        _writes = ledger as IWriteBatch;
     }
 
     public SessionOutcome Run(CollectionJob job, string serviceKey, string savePath, string fromTime, CancellationToken cancel)
@@ -78,18 +80,72 @@ public sealed class SessionRunner
             return Log(job, Failed(flagCode));
         }
 
-        if (job.Kind == JobKind.Stored)
+        if (job.Kind == JobKind.Stored && !SetupCalendar.SplitsByYear(job))
         {
             _ledger.SaveOpenFromTime(job.Dataspec, option, fromTime);
         }
 
+        var outcome = SetupCalendar.SplitsByYear(job)
+            ? RunYears(job, option, fromTime, cancel)
+            : RunAttempts(job, option, fromTime, seal: true, cancel);
+        return Log(job, outcome);
+    }
+
+    private SessionOutcome RunYears(CollectionJob job, int option, string fromTime, CancellationToken cancel)
+    {
+        var windows = SetupCalendar.Windows(fromTime, Jst.Now(_clock.UtcNow).Year);
+        SessionOutcome last = Failed(-1);
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var window = windows[i];
+            var mark = _ledger.GetWatermark(job.Dataspec, option);
+            if (!string.Equals(mark.OpenFromTime, window, StringComparison.Ordinal))
+            {
+                AlignWindow(job, option, window);
+            }
+
+            var seal = i == windows.Count - 1;
+            _log.Info($"setup window dataspec={job.Dataspec} from={window}");
+            last = RunAttempts(job, option, window, seal, cancel);
+            if (last.Kind is SessionOutcomeKind.Failed or SessionOutcomeKind.Cancelled)
+            {
+                return last;
+            }
+
+            if (last.Kind == SessionOutcomeKind.NoData && seal)
+            {
+                _raw.CompleteDataspec(job.Dataspec);
+            }
+        }
+
+        return last;
+    }
+
+    private void AlignWindow(CollectionJob job, int option, string window)
+    {
+        _writes?.BeginWriteBatch();
+        try
+        {
+            _ledger.SaveResume(job.Dataspec, option, null, null, 0);
+            _ledger.SaveOpenFromTime(job.Dataspec, option, window);
+            _writes?.CommitWriteBatch();
+        }
+        catch
+        {
+            _writes?.DiscardWriteBatch();
+            throw;
+        }
+    }
+
+    private SessionOutcome RunAttempts(CollectionJob job, int option, string fromTime, bool seal, CancellationToken cancel)
+    {
         for (var attempt = 0; attempt < 3; attempt++)
         {
             var skip = job.Option == 4 ? _ledger.GetWatermark(job.Dataspec, option).ResumeSkipCount : 0;
-            var outcome = ReadOnce(job, option, fromTime, skip, cancel);
+            var outcome = ReadOnce(job, option, fromTime, skip, seal, cancel);
             if (outcome.Kind != SessionOutcomeKind.Failed || outcome.Code is not (-402 or -403) || attempt == 2)
             {
-                return Log(job, outcome);
+                return outcome;
             }
 
             if (!string.IsNullOrEmpty(outcome.LastFileTimestamp))
@@ -100,10 +156,10 @@ public sealed class SessionRunner
             _log.Info($"file repair dataspec={job.Dataspec} code={outcome.Code}");
         }
 
-        return Log(job, Failed(-402));
+        return Failed(-402);
     }
 
-    private SessionOutcome ReadOnce(CollectionJob job, int option, string fromTime, int skip, CancellationToken cancel)
+    private SessionOutcome ReadOnce(CollectionJob job, int option, string fromTime, int skip, bool seal, CancellationToken cancel)
     {
         var opened = job.Kind is JobKind.Realtime or JobKind.Odds
             ? _jv.RtOpen(job.Dataspec, job.Key)
@@ -158,12 +214,17 @@ public sealed class SessionRunner
             var read = ReadRecords(job, option, skip, generation, opened, cancel);
             if (read.Kind == SessionOutcomeKind.Success)
             {
-                _raw.CompleteDataspec(job.Dataspec);
-                if (job.Kind == JobKind.Stored)
+                if (seal)
                 {
-                    var mark = _ledger.GetWatermark(job.Dataspec, option);
-                    _ledger.CommitWatermark(job.Dataspec, option, Newer(mark.Confirmed, opened.LastFileTimestamp), _clock.UtcNow);
+                    _raw.CompleteDataspec(job.Dataspec);
+                    if (job.Kind == JobKind.Stored)
+                    {
+                        var mark = _ledger.GetWatermark(job.Dataspec, option);
+                        _ledger.CommitWatermark(job.Dataspec, option, Newer(mark.Confirmed, opened.LastFileTimestamp), _clock.UtcNow);
+                    }
                 }
+
+                _writes?.CommitWriteBatch();
             }
 
             if (generation is long id)
@@ -180,8 +241,14 @@ public sealed class SessionRunner
 
             return read;
         }
+        catch
+        {
+            _writes?.DiscardWriteBatch();
+            throw;
+        }
         finally
         {
+            _writes?.ReleaseWriter();
             _jv.Close();
         }
     }
@@ -228,12 +295,16 @@ public sealed class SessionRunner
         var filesDone = skip;
         var sinceBoundary = new List<long>();
         ReportRead(job, filesDone, opened.ReadCount, complete: false);
+        _writes?.BeginWriteBatch();
+        try
+        {
         while (true)
         {
             _pump();
             if (cancel.IsCancellationRequested)
             {
                 _jv.CancelDownload();
+                AbandonBatch();
                 return Cancelled();
             }
 
@@ -242,12 +313,11 @@ public sealed class SessionRunner
             {
                 if (read.Payload is null || read.Payload.Length < read.Code)
                 {
+                    AbandonBatch();
                     return Failed(-1_000_001);
                 }
 
-                var payload = read.Payload.Length == read.Code
-                    ? read.Payload
-                    : read.Payload.AsSpan(0, read.Code).ToArray();
+                var payload = read.Payload.AsSpan(0, read.Code);
                 var classified = RecordKeys.Classify(payload);
                 var hash = SHA256.HashData(payload);
                 var existing = _ledger.FindByHash(job.Dataspec, hash);
@@ -259,7 +329,7 @@ public sealed class SessionRunner
                 }
                 else
                 {
-                    var frame = _raw.Append(job.Dataspec, _clock.UtcNow, payload);
+                    var frame = _raw.Append(job.Dataspec, _clock.UtcNow, payload, hash);
                     id = _ledger.IndexRecord(new IndexDraft(
                         job.Dataspec,
                         frame.Path,
@@ -316,6 +386,8 @@ public sealed class SessionRunner
                         job.Option == 4 ? skip : 0);
                 }
 
+                _writes?.CommitWriteBatch();
+                _writes?.BeginWriteBatch();
                 ReportRead(job, filesDone, opened.ReadCount, complete: false);
                 continue;
             }
@@ -334,6 +406,7 @@ public sealed class SessionRunner
                     opened.LastFileTimestamp);
             }
 
+            AbandonBatch();
             if (read.Code is -402 or -403)
             {
                 return new SessionOutcome(
@@ -357,7 +430,15 @@ public sealed class SessionRunner
                 opened.DownloadCount,
                 opened.LastFileTimestamp);
         }
+        }
+        catch
+        {
+            AbandonBatch();
+            throw;
+        }
     }
+
+    private void AbandonBatch() => _writes?.DiscardWriteBatch();
 
     private void Report(CollectionJob job, ProgressPhase phase, int current, int total, string unit) =>
         _progress(new ProgressReport(job.Dataspec, phase, current, total, unit, job.Kind == JobKind.Stored));

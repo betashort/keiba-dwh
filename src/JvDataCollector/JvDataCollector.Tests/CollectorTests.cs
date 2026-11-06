@@ -157,6 +157,7 @@ public class SessionTests
     public void SetupResumeSkipsCompletedFiles()
     {
         using var harness = new Harness();
+        harness.Store.SaveOpenFromTime("RACE", 4, "19860101000000-19870101000000");
         harness.Store.SaveResume("RACE", 4, "done.jvd", "20260101000000", 2);
         harness.Jv.Reads.Enqueue(new ReadResult(0, null, null));
         harness.Coordinator.Execute(new CollectionJob
@@ -389,6 +390,20 @@ public class SessionTests
 
 public class ScheduleTests
 {
+    [Fact]
+    public void PausedCollectionDoesNotQueueUntilResumed()
+    {
+        using var harness = new Harness();
+        var monday = new DateTimeOffset(2026, 11, 2, 5, 0, 0, TimeSpan.Zero);
+        harness.Coordinator.PauseCollection();
+        harness.Coordinator.CatchUp(monday);
+        Assert.False(harness.Coordinator.RequestUserFetch());
+        Assert.Equal(0, harness.Coordinator.Queue.Count);
+        harness.Coordinator.ResumeCollection();
+        harness.Coordinator.CatchUp(monday);
+        Assert.Equal(DataspecCatalog.DefaultCodes.Count, harness.Coordinator.Queue.Count);
+    }
+
     [Fact]
     public void MissedMondaySlotsAreQueuedOnce()
     {

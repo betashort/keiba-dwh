@@ -74,7 +74,9 @@ public sealed class FakeJv : IJvGateway
     public Queue<int>? Statuses { get; set; }
     public string? FileStamp { get; set; } = "20261102090000";
     public Queue<ReadResult> Reads { get; } = new();
+    public Queue<int>? OpenCodes { get; set; }
     public List<string> Calls { get; } = [];
+    public List<(string Dataspec, string FromTime, int Option)> Opened { get; } = [];
     public Action? OnRead { get; set; }
 
     public int Init(string softwareId)
@@ -102,7 +104,9 @@ public sealed class FakeJv : IJvGateway
     public OpenResult Open(string dataspec, string fromTime, int option)
     {
         Calls.Add("open");
-        return new OpenResult(OpenCode, ReadCount, DownloadCount, LastTimestamp);
+        Opened.Add((dataspec, fromTime, option));
+        var code = OpenCodes is { Count: > 0 } ? OpenCodes.Dequeue() : OpenCode;
+        return new OpenResult(code, ReadCount, DownloadCount, LastTimestamp);
     }
 
     public OpenResult RtOpen(string dataspec, string key)

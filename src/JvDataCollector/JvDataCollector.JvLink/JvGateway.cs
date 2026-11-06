@@ -13,6 +13,10 @@ public sealed class JvGateway : IJvGateway
     private IConnectionPoint? _point;
     private int _cookie;
     private bool _watching;
+    private readonly byte[] _getsBuffer = new byte[GetsCapacity];
+    private readonly object?[] _getsArgs = new object?[3];
+
+    public const int GetsCapacity = 110_000;
 
     public JvGateway(IAppLog log)
     {
@@ -50,28 +54,23 @@ public sealed class JvGateway : IJvGateway
 
     public ReadResult Read()
     {
-        var args = new object?[] { new byte[1], 110000, "" };
-        var code = Call("JVGets", args, 0, 2);
-        var name = args[2] as string;
+        _getsArgs[0] = _getsBuffer;
+        _getsArgs[1] = _getsBuffer.Length;
+        _getsArgs[2] = "";
+        var code = Call("JVGets", _getsArgs, 0, 2);
+        var name = _getsArgs[2] as string;
         if (code <= 0)
         {
             return new ReadResult(code, null, name);
         }
 
-        if (args[0] is not byte[] bytes || bytes.Length < code)
+        if (_getsArgs[0] is not byte[] bytes || bytes.Length < code)
         {
             _log.Error("JVGets のバイト列を取得できません。");
             return new ReadResult(-1_000_001, null, name);
         }
 
-        if (bytes.Length == code)
-        {
-            return new ReadResult(code, bytes, name);
-        }
-
-        var copy = new byte[code];
-        Buffer.BlockCopy(bytes, 0, copy, 0, code);
-        return new ReadResult(code, copy, name);
+        return new ReadResult(code, bytes, name);
     }
 
     public void Skip() => Call("JVSkip");

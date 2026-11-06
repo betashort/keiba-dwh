@@ -15,15 +15,20 @@ public static class RawFrameCodec
 
     public static byte[] Write(Stream stream, long sequence, ReadOnlySpan<byte> payload)
     {
+        var hash = SHA256.HashData(payload);
+        Write(stream, sequence, payload, hash);
+        return hash;
+    }
+
+    public static void Write(Stream stream, long sequence, ReadOnlySpan<byte> payload, ReadOnlySpan<byte> hash)
+    {
         Span<byte> header = stackalloc byte[HeaderSize];
         Magic.CopyTo(header);
         BinaryPrimitives.WriteUInt64LittleEndian(header[5..], (ulong)sequence);
         BinaryPrimitives.WriteUInt32LittleEndian(header[13..], (uint)payload.Length);
         stream.Write(header);
         stream.Write(payload);
-        var hash = SHA256.HashData(payload);
         stream.Write(hash);
-        return hash;
     }
 
     public static bool TryRead(

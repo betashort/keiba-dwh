@@ -27,11 +27,6 @@ internal static class Program
             ? Path.Combine(AppPaths.Root, "pending")
             : config.DataRoot;
         var store = new LandingStore(root, log);
-        if (!string.IsNullOrWhiteSpace(config.DataRoot))
-        {
-            store.Repair(RecordKeys.Classify);
-        }
-
         using var worker = new StaWorker(log, attention);
         worker.Start();
         var coordinator = new CollectionCoordinator(
@@ -47,6 +42,7 @@ internal static class Program
             new ThreadDelay(),
             () => Application.DoEvents());
         worker.Attach(coordinator);
+        coordinator.PauseCollection();
         if (!JvRegistration.IsInstalled)
         {
             attention.Raise(AttentionReason.JvLinkMissing, "32bit の JV-Link がありません。");
@@ -94,11 +90,43 @@ internal static class Program
             tray.ShowSetup();
         }
 
+        Thread? repairThread = null;
+        if (!string.IsNullOrWhiteSpace(configs.Load().DataRoot))
+        {
+            repairThread = new Thread(() =>
+            {
+                try
+                {
+                    log.Info("repair start");
+                    store.Repair(RecordKeys.Classify);
+                    log.Info("repair done");
+                }
+                catch (Exception ex)
+                {
+                    log.Error(ex.GetType().Name);
+                }
+                finally
+                {
+                    coordinator.ResumeCollection();
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "Repair",
+            };
+            repairThread.Start();
+        }
+        else
+        {
+            coordinator.ResumeCollection();
+        }
+
         Application.Run(tray);
         schedulerStop.Cancel();
         scheduler.Join(TimeSpan.FromSeconds(20));
         coordinator.RequestShutdown();
         worker.Dispose();
+        repairThread?.Join();
         store.Dispose();
     }
 

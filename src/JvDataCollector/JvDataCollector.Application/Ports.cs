@@ -117,8 +117,19 @@ public readonly record struct FrameWritten(string Path, long Sequence, long Offs
 public interface IRawLog
 {
     FrameWritten Append(string dataspec, DateTimeOffset acquiredUtc, ReadOnlySpan<byte> payload);
+
+    FrameWritten Append(string dataspec, DateTimeOffset acquiredUtc, ReadOnlySpan<byte> payload, byte[] sha256);
+
     void CompleteDataspec(string dataspec);
     void Repair(Func<ReadOnlySpan<byte>, FrameClassification> classify);
+}
+
+public interface IWriteBatch
+{
+    void BeginWriteBatch();
+    void CommitWriteBatch();
+    void DiscardWriteBatch();
+    void ReleaseWriter();
 }
 
 public interface ILedger

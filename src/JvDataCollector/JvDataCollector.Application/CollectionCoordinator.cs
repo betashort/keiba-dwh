@@ -112,6 +112,7 @@ public sealed class CollectionCoordinator
     private int _running;
     private int _runId;
     private int _activeRun;
+    private int _collectionPaused;
     private bool _scheduleBlocked;
     private volatile ProgressSnapshot _progress = ProgressSnapshot.Idle;
 
@@ -157,9 +158,15 @@ public sealed class CollectionCoordinator
 
     public void Repair() => _raw.Repair(RecordKeys.Classify);
 
+    public void PauseCollection() => Interlocked.Exchange(ref _collectionPaused, 1);
+
+    public void ResumeCollection() => Interlocked.Exchange(ref _collectionPaused, 0);
+
+    public bool CollectionPaused => Volatile.Read(ref _collectionPaused) == 1;
+
     public void CatchUp(DateTimeOffset utcNow)
     {
-        if (!Ready())
+        if (CollectionPaused || !Ready())
         {
             return;
         }
@@ -192,7 +199,7 @@ public sealed class CollectionCoordinator
 
     public void MaybeEnqueueOdds(DateTimeOffset utcNow)
     {
-        if (!Ready() || _scheduleBlocked)
+        if (CollectionPaused || !Ready() || _scheduleBlocked)
         {
             return;
         }
@@ -217,7 +224,7 @@ public sealed class CollectionCoordinator
 
     public bool WatchDesired(DateTimeOffset utcNow)
     {
-        if (!Ready())
+        if (CollectionPaused || !Ready())
         {
             return false;
         }
@@ -227,12 +234,22 @@ public sealed class CollectionCoordinator
 
     public bool RequestUserFetch()
     {
+        if (CollectionPaused)
+        {
+            return false;
+        }
+
         Reload();
         return _queue.RequestRound(JobGroups.User, BuildUserJobs());
     }
 
     public bool RequestSetup()
     {
+        if (CollectionPaused)
+        {
+            return false;
+        }
+
         Reload();
         return _queue.RequestRound(JobGroups.Setup, BuildSetupJobs());
     }
@@ -245,7 +262,7 @@ public sealed class CollectionCoordinator
 
     public void OnRealtime(RealtimeEventKind kind, string key)
     {
-        if (!Ready())
+        if (CollectionPaused || !Ready())
         {
             return;
         }

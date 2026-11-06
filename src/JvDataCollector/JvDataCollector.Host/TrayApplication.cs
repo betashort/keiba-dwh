@@ -249,6 +249,13 @@ public sealed class TrayApplication : ApplicationContext
             return;
         }
 
+        if (_coordinator.CollectionPaused)
+        {
+            _icon.Icon = _busy;
+            _icon.Text = "起動準備";
+            return;
+        }
+
         if (_coordinator.IsBusy(DateTimeOffset.UtcNow))
         {
             _icon.Icon = _busy;

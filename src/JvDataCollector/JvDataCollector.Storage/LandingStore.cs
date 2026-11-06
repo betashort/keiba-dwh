@@ -1,9 +1,10 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 
 namespace JvDataCollector;
 
-public sealed class LandingStore : IRawLog, ILedger, IDisposable
+public sealed class LandingStore : IRawLog, ILedger, IWriteBatch, IDisposable
 {
     public const string PublishedRecordView = "published_record";
     public const string ActiveOb14View = "ob14_active";
@@ -13,6 +14,12 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     private string _root;
     private readonly long _maxFileBytes;
     private readonly IAppLog _log;
+    private SqliteTransaction? _batch;
+    private FileStream? _stream;
+    private long _streamFileId;
+    private string? _streamPath;
+    private long _streamLength;
+    private readonly Dictionary<string, long> _touched = new(StringComparer.OrdinalIgnoreCase);
 
     public LandingStore(string dataRoot, IAppLog log, long? maxFileBytes = null)
     {
@@ -49,6 +56,8 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
                 return;
             }
 
+            DiscardWriteBatchUnlocked();
+            CloseStream();
             _connection.Dispose();
             _root = dataRoot;
             Directory.CreateDirectory(Path.Combine(_root, "jvlink"));
@@ -70,12 +79,68 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     public string LedgerPath => Path.Combine(_root, "state", "ledger.sqlite");
 
-    public void Dispose() => _connection.Dispose();
-
-    public FrameWritten Append(string dataspec, DateTimeOffset acquiredUtc, ReadOnlySpan<byte> payload)
+    public void Dispose()
     {
         lock (_gate)
         {
+            DiscardWriteBatchUnlocked();
+            CloseStream();
+            _connection.Dispose();
+        }
+    }
+
+    public void BeginWriteBatch()
+    {
+        lock (_gate)
+        {
+            _batch ??= _connection.BeginTransaction();
+        }
+    }
+
+    public void CommitWriteBatch()
+    {
+        lock (_gate)
+        {
+            if (_batch is null)
+            {
+                return;
+            }
+
+            _stream?.Flush(flushToDisk: true);
+            _batch.Commit();
+            _batch.Dispose();
+            _batch = null;
+            _touched.Clear();
+        }
+    }
+
+    public void DiscardWriteBatch()
+    {
+        lock (_gate)
+        {
+            DiscardWriteBatchUnlocked();
+        }
+    }
+
+    public void ReleaseWriter()
+    {
+        lock (_gate)
+        {
+            if (_batch is null)
+            {
+                CloseStream();
+            }
+        }
+    }
+
+    public FrameWritten Append(string dataspec, DateTimeOffset acquiredUtc, ReadOnlySpan<byte> payload) =>
+        Append(dataspec, acquiredUtc, payload, SHA256.HashData(payload));
+
+    public FrameWritten Append(string dataspec, DateTimeOffset acquiredUtc, ReadOnlySpan<byte> payload, byte[] sha256)
+    {
+        lock (_gate)
+        {
+            var hash = sha256.Length == RawFrameCodec.HashSize ? sha256 : SHA256.HashData(payload);
             var day = DateOnly.FromDateTime(Jst.Now(acquiredUtc).DateTime);
             var frameSize = RawFrameCodec.FrameSize(payload.Length);
             var current = PickFile(dataspec, day, frameSize);
@@ -84,17 +149,27 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
                 current = CreateFile(dataspec, day);
             }
 
+            EnsureStream(current);
+            if (_batch is not null && !_touched.ContainsKey(current.Path))
+            {
+                _touched[current.Path] = _streamLength;
+            }
+
             var sequence = current.LastSeq + 1;
-            using var stream = new FileStream(current.Path, FileMode.Append, FileAccess.Write, FileShare.Read);
-            var offset = stream.Position + RawFrameCodec.HeaderSize;
-            var hash = RawFrameCodec.Write(stream, sequence, payload);
-            stream.Flush(flushToDisk: true);
-            var length = stream.Length;
+            var offset = _streamLength + RawFrameCodec.HeaderSize;
+            RawFrameCodec.Write(_stream!, sequence, payload, hash);
+            _streamLength += frameSize;
             Execute(
                 "UPDATE raw_file SET last_seq=$s, byte_length=$n WHERE id=$id",
                 ("$s", sequence),
-                ("$n", length),
+                ("$n", _streamLength),
                 ("$id", current.Id));
+            if (_batch is null)
+            {
+                _stream!.Flush(flushToDisk: true);
+                CloseStream();
+            }
+
             return new FrameWritten(current.Path, sequence, offset, payload.Length, hash);
         }
     }
@@ -131,7 +206,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = """
                 SELECT confirmed, resume_file_name, resume_timestamp, resume_skip_count, open_fromtime,
                        consecutive_failures, suspended_on, option1_rejected, last_result, last_new_count, last_error_code
@@ -273,7 +348,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = "SELECT id FROM record_index WHERE dataspec=$d AND sha256=$h";
             Add(command, ("$d", dataspec));
             command.Parameters.Add("$h", SqliteType.Blob).Value = sha256;
@@ -294,7 +369,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
             }
 
             var fileId = FileId(draft.Path, draft.Dataspec);
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = """
                 INSERT INTO record_index
                     (dataspec, record_id, sha256, file_id, seq, offset, length, acquired_utc)
@@ -362,7 +437,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = """
                 INSERT INTO ob14_generation (meeting_day, generation, active, created_utc)
                 VALUES (
@@ -414,7 +489,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = "SELECT generation FROM ob14_generation WHERE meeting_day=$d AND active=1";
             Add(command, ("$d", meetingDay));
             var value = command.ExecuteScalar();
@@ -426,7 +501,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = """
                 SELECT COUNT(*)
                 FROM ob14_generation_record r
@@ -455,7 +530,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
                 return [];
             }
 
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             var names = new List<string>();
             var index = 0;
             foreach (var day in days)
@@ -489,7 +564,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
     {
         lock (_gate)
         {
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = "SELECT 1 FROM scheduler_fire WHERE job_key=$k";
             Add(command, ("$k", jobKey));
             return command.ExecuteScalar() is not null;
@@ -548,7 +623,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
                 continue;
             }
 
-            using var command = _connection.CreateCommand();
+            using var command = NewCommand();
             command.CommandText = """
                 INSERT INTO record_index
                     (dataspec, record_id, sha256, file_id, seq, offset, length, acquired_utc)
@@ -570,7 +645,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private FileRow? PickFile(string dataspec, DateOnly day, int frameSize)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = """
             SELECT id, path, byte_length, last_seq
             FROM raw_file WHERE dataspec=$d AND complete=0 ORDER BY id DESC
@@ -624,7 +699,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
         var path = Path.Combine(directory, sequence.ToString("D6", CultureInfo.InvariantCulture) + ".bin");
         File.WriteAllBytes(path, []);
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = """
             INSERT INTO raw_file (dataspec, path, first_seq, last_seq, complete, byte_length, created_utc)
             VALUES ($d, $p, 1, 0, 0, 0, $t)
@@ -637,7 +712,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private long EnsureFileRow(string path, string dataspec, long length, long lastSeq, bool complete)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT id FROM raw_file WHERE path=$p";
         Add(command, ("$p", path));
         var existing = command.ExecuteScalar();
@@ -651,7 +726,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
             return id;
         }
 
-        using var insert = _connection.CreateCommand();
+        using var insert = NewCommand();
         insert.CommandText = """
             INSERT INTO raw_file (dataspec, path, first_seq, last_seq, complete, byte_length, created_utc)
             VALUES ($d, $p, 1, $s, $c, $n, $t)
@@ -669,7 +744,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private long FileId(string path, string dataspec)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT id FROM raw_file WHERE path=$p";
         Add(command, ("$p", path));
         var value = command.ExecuteScalar();
@@ -683,7 +758,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private bool IsComplete(string path)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT complete FROM raw_file WHERE path=$p";
         Add(command, ("$p", path));
         return command.ExecuteScalar() is long value && value == 1;
@@ -691,7 +766,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private bool FindBySequence(long fileId, long sequence)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT 1 FROM record_index WHERE file_id=$f AND seq=$s";
         Add(command, ("$f", fileId), ("$s", sequence));
         return command.ExecuteScalar() is not null;
@@ -699,7 +774,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private long? FindByHashUnlocked(string dataspec, byte[] sha256)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT id FROM record_index WHERE dataspec=$d AND sha256=$h";
         Add(command, ("$d", dataspec));
         command.Parameters.Add("$h", SqliteType.Blob).Value = sha256;
@@ -738,7 +813,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private WatermarkState GetWatermarkUnlocked(string dataspec, int option)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT resume_timestamp FROM watermark WHERE dataspec=$d AND option=$o";
         Add(command, ("$d", dataspec), ("$o", option));
         var value = command.ExecuteScalar() as string;
@@ -747,7 +822,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private List<string> Strings(string sql)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = sql;
         var list = new List<string>();
         using var reader = command.ExecuteReader();
@@ -761,17 +836,93 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private long LastId()
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = "SELECT last_insert_rowid();";
         return (long)command.ExecuteScalar()!;
     }
 
     private void Execute(string sql, params (string Name, object? Value)[] parameters)
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = sql;
         Add(command, parameters);
         command.ExecuteNonQuery();
+    }
+
+    private SqliteCommand NewCommand()
+    {
+        var command = _connection.CreateCommand();
+        if (_batch is not null)
+        {
+            command.Transaction = _batch;
+        }
+
+        return command;
+    }
+
+    private void EnsureStream(FileRow current)
+    {
+        if (_stream is not null && _streamFileId == current.Id)
+        {
+            return;
+        }
+
+        if (_stream is not null)
+        {
+            _stream.Flush(flushToDisk: _batch is not null);
+            CloseStream();
+        }
+
+        _stream = new FileStream(
+            current.Path,
+            FileMode.Open,
+            FileAccess.Write,
+            FileShare.ReadWrite,
+            1024 * 1024,
+            FileOptions.SequentialScan);
+        _stream.Position = _stream.Length;
+        _streamLength = _stream.Position;
+        _streamFileId = current.Id;
+        _streamPath = current.Path;
+    }
+
+    private void CloseStream()
+    {
+        _stream?.Dispose();
+        _stream = null;
+        _streamPath = null;
+        _streamFileId = 0;
+    }
+
+    private void DiscardWriteBatchUnlocked()
+    {
+        if (_batch is not null)
+        {
+            _batch.Rollback();
+            _batch.Dispose();
+            _batch = null;
+        }
+
+        if (_stream is not null && _streamPath is not null && _touched.TryGetValue(_streamPath, out var current))
+        {
+            _stream.SetLength(current);
+            _streamLength = current;
+            _stream.Flush(flushToDisk: true);
+        }
+
+        foreach (var (path, length) in _touched)
+        {
+            if (string.Equals(path, _streamPath, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            using var other = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+            other.SetLength(length);
+            other.Flush(flushToDisk: true);
+        }
+
+        _touched.Clear();
     }
 
     private static void Add(SqliteCommand command, params (string Name, object? Value)[] parameters)
@@ -811,7 +962,7 @@ public sealed class LandingStore : IRawLog, ILedger, IDisposable
 
     private void CreateSchema()
     {
-        using var command = _connection.CreateCommand();
+        using var command = NewCommand();
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS watermark (
               dataspec TEXT NOT NULL,
