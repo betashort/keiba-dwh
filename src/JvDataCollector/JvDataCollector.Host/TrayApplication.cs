@@ -14,7 +14,9 @@ public sealed class TrayApplication : ApplicationContext
     private readonly Icon _busy;
     private readonly Icon _alert;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
+    private readonly EventWaitHandle _showRequest;
     private ImportProgressForm? _progressForm;
+    private StatusForm? _statusForm;
     private int _dismissedRun;
     private bool _closingProgress;
 
@@ -25,7 +27,8 @@ public sealed class TrayApplication : ApplicationContext
         IConfigStore configs,
         ISecretStore secrets,
         IAppLog log,
-        IAttention attention)
+        IAttention attention,
+        EventWaitHandle showRequest)
     {
         _coordinator = coordinator;
         _worker = worker;
@@ -34,6 +37,7 @@ public sealed class TrayApplication : ApplicationContext
         _secrets = secrets;
         _log = log;
         _attention = attention;
+        _showRequest = showRequest;
         _idle = IconFactory.Circle(Color.DimGray);
         _busy = IconFactory.Circle(Color.DodgerBlue);
         _alert = IconFactory.Circle(Color.OrangeRed);
@@ -124,13 +128,45 @@ public sealed class TrayApplication : ApplicationContext
         _log.Info("realtime schedule saved");
     }
 
+    public void ShowStatusOnStart()
+    {
+        var once = new System.Windows.Forms.Timer { Interval = 1 };
+        once.Tick += (_, _) =>
+        {
+            once.Stop();
+            once.Dispose();
+            ShowStatus();
+        };
+        once.Start();
+    }
+
     private void ShowStatus()
     {
-        using var form = new StatusForm(
+        if (_statusForm is { IsDisposed: false })
+        {
+            if (_statusForm.WindowState == FormWindowState.Minimized)
+            {
+                _statusForm.WindowState = FormWindowState.Normal;
+            }
+
+            _statusForm.Activate();
+            return;
+        }
+
+        var form = new StatusForm(
             () => _coordinator.Status(DateTimeOffset.UtcNow),
             () => _coordinator.Progress,
             () => _attention.HasAttention ? _attention.Message : null);
-        form.ShowDialog();
+        _statusForm = form;
+        form.FormClosed += (_, _) =>
+        {
+            if (ReferenceEquals(_statusForm, form))
+            {
+                _statusForm = null;
+            }
+        };
+        form.Show();
+        form.Activate();
     }
 
     private void OpenJvSettings()
@@ -240,6 +276,11 @@ public sealed class TrayApplication : ApplicationContext
 
     private void UpdateIcon()
     {
+        if (_showRequest.WaitOne(0))
+        {
+            ShowStatus();
+        }
+
         var progress = _coordinator.Progress;
         ShowImport(progress);
         if (_attention.HasAttention || !JvRegistration.IsInstalled)
@@ -324,6 +365,11 @@ public sealed class TrayApplication : ApplicationContext
     private void Exit()
     {
         CloseProgress();
+        if (_statusForm is { IsDisposed: false })
+        {
+            _statusForm.Close();
+        }
+
         _coordinator.RequestShutdown();
         _worker.Dispose();
         _icon.Visible = false;

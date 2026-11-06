@@ -173,6 +173,7 @@ public sealed class StatusForm : Form
         }
 
         var close = new Button { Text = "閉じる", Location = DialogPx.P(480, 364), Size = DialogPx.Z(96, 28), DialogResult = DialogResult.OK };
+        close.Click += (_, _) => Close();
         Controls.Add(_progressLabel);
         Controls.Add(_progressBar);
         Controls.Add(_list);
@@ -284,5 +285,6 @@ public sealed class ImportProgressForm : Form
         base.OnShown(e);
         var area = Screen.FromControl(this).WorkingArea;
         Location = new Point(area.Right - Width - DialogPx.S(16), area.Bottom - Height - DialogPx.S(16));
+        Activate();
     }
 }

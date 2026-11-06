@@ -3,18 +3,21 @@ namespace JvDataCollector;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        var background = args.Any(arg => arg == "--background");
         using var mutex = AcquireMutex();
         if (mutex is null)
         {
             return;
         }
 
+        using var showRequest = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\KeibaDwh.Collector.Show");
         ApplicationConfiguration.Initialize();
+        LogonRegistration.EnsureBackgroundArgument();
         var log = new RollingFileLog();
         var attention = new AttentionBoard();
-        Application.ThreadException += (_, args) => log.Error(args.Exception.GetType().Name);
+        Application.ThreadException += (_, eventArgs) => log.Error(eventArgs.Exception.GetType().Name);
         var configs = new JsonConfigStore();
         var secrets = new DpapiSecretStore();
         if (secrets.Exists)
@@ -79,7 +82,7 @@ internal static class Program
             Name = "Scheduler",
         };
         scheduler.Start();
-        var tray = new TrayApplication(coordinator, worker, store, configs, secrets, log, attention);
+        var tray = new TrayApplication(coordinator, worker, store, configs, secrets, log, attention, showRequest);
         if (!JvRegistration.IsInstalled)
         {
             using var guide = new GuideForm();
@@ -88,6 +91,11 @@ internal static class Program
         else if (!config.SettingsComplete || !secrets.Exists)
         {
             tray.ShowSetup();
+        }
+
+        if (!background && JvRegistration.IsInstalled && configs.Load().SettingsComplete && secrets.Exists)
+        {
+            tray.ShowStatusOnStart();
         }
 
         Thread? repairThread = null;
@@ -130,6 +138,18 @@ internal static class Program
         store.Dispose();
     }
 
+    private static void SignalShowStatus()
+    {
+        try
+        {
+            using var show = EventWaitHandle.OpenExisting(@"Local\KeibaDwh.Collector.Show");
+            show.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+        }
+    }
+
     private static Mutex? AcquireMutex()
     {
         try
@@ -141,6 +161,7 @@ internal static class Program
             }
 
             mutex.Dispose();
+            SignalShowStatus();
             return null;
         }
         catch (AbandonedMutexException)

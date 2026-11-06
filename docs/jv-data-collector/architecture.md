@@ -65,7 +65,7 @@ flowchart LR
 
 ### 4.1 実行単位
 
-1 台の PC、1 人のログオン セッション、1 プロセス。二重起動は名前付きミューテックス `Local\KeibaDwh.Collector` で拒む。JV-Link の設定画面は同時に開けず、セッションを重ねると `JVOpen` が `-202` になるためである。
+1 台の PC、1 人のログオン セッション、1 プロセス。二重起動は名前付きミューテックス `Local\KeibaDwh.Collector` で拒む。拒まれた側は、名前付きイベント `Local\KeibaDwh.Collector.Show` で常駐側に「状態」を開かせて終える。JV-Link の設定画面は同時に開けず、セッションを重ねると `JVOpen` が `-202` になるためである。
 
 プロセスは C#、Windows Forms、x86 に固定し、公式の 32bit JV-Link とビット数を一致させる。ターゲットフレームワークは `net10.0-windows`。初期対象は SDK 5.0.0 の 32bit と、日本語版 Windows 11 である。
 
@@ -96,7 +96,7 @@ flowchart TB
   sta --> root
 ```
 
-ログオン起動は `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に登録する。登録する実行ファイルは `%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe` である。公開と差し替えは [deployment.md](deployment.md)。タスク スケジューラの Session 0 起動や Windows サービスにはしない。ログオン後 1 分以内に常駐し、確定済み水位から再開する。
+ログオン起動は `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に登録する。登録するコマンドは `%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe --background` である。`--background` の起動では「状態」を開かない。引数なしの起動で初期設定が済んでいるときは「状態」を開く。公開と差し替えは [deployment.md](deployment.md)。タスク スケジューラの Session 0 起動や Windows サービスにはしない。ログオン後 1 分以内に常駐し、確定済み水位から再開する。
 
 ### 4.2 スレッド
 
@@ -200,7 +200,8 @@ flowchart TB
 
 - 単一インスタンス、構成の組み立て、STA の起動と停止
 - 通知領域の 3 状態（待機、取得中、要対応）とメニュー
-- 状態ウィンドウへのスナップショット表示。取得中は `JVStatus / downloadcount` と、その段階の残り時間
+- 状態ウィンドウへのスナップショット表示。取得中は `JVStatus / downloadcount` と、その段階の残り時間。蓄積の取得を始めた時点で同じ内容の窓を開く
+- 引数なしの起動で、初期設定済みなら「状態」を開く。二重起動の後発は、常駐側の「状態」を前面に出す
 - 初回設定が終わるまでスケジューラを開始しない
 - `JVSetUIProperties` をメニューから開く。戻り値 0 はキャンセル、`-100` は失敗
 - ログオン起動の登録と解除
@@ -278,7 +279,7 @@ sequenceDiagram
   end
 ```
 
-初回設定の完了条件は [design.md](design.md) の初回設定の 5 項目である。COM 登録、利用キー、存在する保存先、対象 dataspec、ログオン起動。このうち 1 つでも欠ける間、定時取得は始めない。利用キーが無い状態は要対応にする。
+初回設定の完了条件は [design.md](design.md) の初回設定の 5 項目である。COM 登録、利用キー、存在する保存先、対象 dataspec、ログオン起動。このうち 1 つでも欠ける間、定時取得は始めない。利用キーが無い状態は要対応にする。設定済みで引数なしの起動は「状態」を開く。`--background` では開かない。
 
 ### 6.2 セッション
 
@@ -468,7 +469,7 @@ SDK に含まれる C# の構造体はローダが使う。収集アプリは構
 | AD-07 | 利用キーは DPAPI CurrentUser。設定 JSON とログに平文を置かない |
 | AD-08 | ローダは別プロセス。公開条件は完了済み raw と、それを指す索引だけ |
 | AD-09 | `COMM` / `MING` の option = 1 可否は初回の `-116` で決め、台帳に残す |
-| AD-10 | 二重起動をミューテックスで拒む |
+| AD-10 | 二重起動をミューテックスで拒む。後発は常駐側の「状態」を開かせて終える |
 | AD-11 | 倉庫は PostgreSQL。収集アプリは接続文字列とスキーマを持たない |
 
 ## 13. 続章

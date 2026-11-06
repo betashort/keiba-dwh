@@ -19,7 +19,7 @@
 
 `%LocalAppData%\Programs\KeibaDwh\Collector\`
 
-ログオン起動は、初回設定が `JvDataCollector.exe` のフルパスを `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に書く。設定、利用キー、生データ、台帳はインストール先の外にあり、差し替えでも削除でも触らない。
+ログオン起動は、初回設定が `JvDataCollector.exe` のフルパスと `--background` を `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に書く。`--background` では「状態」を開かない。設定、利用キー、生データ、台帳はインストール先の外にあり、差し替えでも削除でも触らない。
 
 前提は、利用者が別に入れた公式の JV-Link 5.0.0 32bit だけである。JV-Link、利用キー、JV-Data は同梱しない。
 
@@ -139,9 +139,9 @@ robocopy $stage $dest /MIR
 ```powershell
 Start-Process (Join-Path $env:LOCALAPPDATA "Programs\KeibaDwh\Collector\JvDataCollector.exe")
 ```
-5. Run に書く値は、バージョンを含まない次のフルパスである。
+5. Run に書く値は、バージョンを含まない次のコマンドである。`--background` はログオン時に「状態」を開かないための引数である。
 
-`%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe`
+`"%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe" --background`
 
 開発中の `dotnet run` や `bin\Debug` は Run に書かない。登録すると、ログオンのたびに開発出力が常駐する。
 
@@ -189,7 +189,7 @@ Run のパスは変えない。インストール先にバージョン番号の�
 ## 7. アプリが守ること
 
 - 読み書きのパスは、exe の位置、`%AppData%`、`DataRoot` から決める。Run から起動したときの作業ディレクトリに依存しない。
-- ログオン起動に登録するのは、このインストール先の `JvDataCollector.exe` だけである。
+- ログオン起動に登録するのは、このインストール先の `JvDataCollector.exe --background` だけである。
 - マニフェストは `asInvoker` のままとする。管理者への昇格を要求しない。
 - アプリ自身を COM 登録しない。
 - インストール先へ設定、利用キー、raw、台帳を書かない。
@@ -214,7 +214,7 @@ Run のパスは変えない。インストール先にバージョン番号の�
 | DP-01 | 自己完結のフォルダ公開とする。単一ファイルにはしない。デスクトップ ランタイムは同梱する |
 | DP-02 | インストール先は `%LocalAppData%\Programs\KeibaDwh\Collector\`。`Program Files` には置かない |
 | DP-03 | 昇格しない。マニフェストは `asInvoker` |
-| DP-04 | Run に書くのは公開した `JvDataCollector.exe` のフルパスだけである。`dotnet run` と `bin\Debug` は書かない |
+| DP-04 | Run に書くのは公開した `JvDataCollector.exe` のフルパスと `--background` だけである。`dotnet run` と `bin\Debug` は書かない |
 | DP-05 | 更新は「終了」のあと、インストール先だけをミラーする。`%AppData%` と `DataRoot` は残す |
 | DP-06 | 削除もインストール先と Run の値だけである。生データと利用キーは残す |
 | DP-07 | アプリ自身の COM 登録はしない |

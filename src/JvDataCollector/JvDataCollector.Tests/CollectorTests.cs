@@ -406,6 +406,24 @@ public class SessionTests
     }
 
     [Fact]
+    public void StoredJobShowsProgressBeforeOpenReturns()
+    {
+        using var harness = new Harness();
+        harness.Jv.OpenCode = -100;
+        ProgressSnapshot? during = null;
+        harness.Jv.OnOpen = () => during = harness.Coordinator.Progress;
+        harness.Coordinator.Execute(Stored("RACE"), CancellationToken.None);
+
+        Assert.NotNull(during);
+        Assert.Equal("RACE", during.Dataspec);
+        Assert.Equal(ProgressPhase.Download, during.Phase);
+        Assert.Equal(0, during.Total);
+        Assert.True(during.Stored);
+        Assert.Contains("計測中", during.Caption(harness.Clock.UtcNow), StringComparison.Ordinal);
+        Assert.Null(harness.Coordinator.Progress.Dataspec);
+    }
+
+    [Fact]
     public void LowDiskStopsBeforeOpen()
     {
         using var harness = new Harness();

@@ -380,6 +380,11 @@ public sealed class CollectionCoordinator
             }
 
             var started = _clock.UtcNow;
+            if (!string.IsNullOrEmpty(job.Dataspec))
+            {
+                ReportProgress(new ProgressReport(job.Dataspec, ProgressPhase.Download, 0, 0, "ファイル", job.Kind == JobKind.Stored));
+            }
+
             var outcome = _session.Run(job, secret, Path.Combine(root, "jvlink"), from, cancel);
             _ledger.RecordRun(new RunDraft(
                 job.Dataspec,

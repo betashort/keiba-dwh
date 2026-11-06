@@ -77,6 +77,7 @@ public sealed class FakeJv : IJvGateway
     public Queue<int>? OpenCodes { get; set; }
     public List<string> Calls { get; } = [];
     public List<(string Dataspec, string FromTime, int Option)> Opened { get; } = [];
+    public Action? OnOpen { get; set; }
     public Action? OnRead { get; set; }
 
     public int Init(string softwareId)
@@ -105,6 +106,7 @@ public sealed class FakeJv : IJvGateway
     {
         Calls.Add("open");
         Opened.Add((dataspec, fromTime, option));
+        OnOpen?.Invoke();
         var code = OpenCodes is { Count: > 0 } ? OpenCodes.Dequeue() : OpenCode;
         return new OpenResult(code, ReadCount, DownloadCount, LastTimestamp);
     }

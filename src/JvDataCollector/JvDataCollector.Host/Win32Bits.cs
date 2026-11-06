@@ -11,13 +11,26 @@ public static class LogonRegistration
         using var key = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
         if (enabled)
         {
-            key?.SetValue(ValueName, $"\"{Application.ExecutablePath}\"");
+            key?.SetValue(ValueName, Command());
         }
         else
         {
             key?.DeleteValue(ValueName, throwOnMissingValue: false);
         }
     }
+
+    public static void EnsureBackgroundArgument()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+        if (key?.GetValue(ValueName) is not string current || current.Contains("--background", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        key.SetValue(ValueName, Command());
+    }
+
+    private static string Command() => $"\"{Application.ExecutablePath}\" --background";
 }
 
 public static class IconFactory
