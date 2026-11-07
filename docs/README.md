@@ -24,6 +24,7 @@
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
 | [dwh-loader/warehouse.md](dwh-loader/warehouse.md) | PostgreSQL の採用 |
+| [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK の置き場。このリポジトリには含めない。バイト定義の正本は仕様書 |
 
-予想モデルの式、特徴量、学習手順、結果の保存先は、モデルの式が決まるまで子文書を置かない。PostgreSQL のテーブル定義と、予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
+予想モデルの式、特徴量、学習手順、結果の保存先は、モデルの式が決まるまで子文書を置かない。データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)。予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。

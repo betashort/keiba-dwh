@@ -6,7 +6,8 @@
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
 - 倉庫: [dwh-loader/warehouse.md](dwh-loader/warehouse.md)
-- 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と画面は収集アプリの設計、テーブル定義と予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- データベース定義書: [dwh-loader/schema.md](dwh-loader/schema.md)
+- 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と画面は収集アプリの設計、テーブル・キー・ビューは [dwh-loader/schema.md](dwh-loader/schema.md)、予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
 
@@ -129,13 +130,14 @@ PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/wareh
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
 | [dwh-loader/warehouse.md](dwh-loader/warehouse.md) | PostgreSQL の採用 |
+| [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK。バイト定義の正本は仕様書 |
 
 ## 7. 未決
 
-- PostgreSQL のテーブル、主キー、有効な版を示すビュー
-- 特別登録馬の区分 1 と区分 2 を、どの行として残すか
 - ローダのインストール、ロールの権限、バックアップ
 - 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
 - 馬券予想モデルを起動するプロセスの置き方。契機と入力は [requirements.md](requirements.md)
 - ローダのターゲットフレームワーク
+
+テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [dwh-loader/schema.md](dwh-loader/schema.md)。

@@ -6,8 +6,9 @@
 - 全体の要求: [../requirements.md](../requirements.md)
 - 全体の構造: [../architecture.md](../architecture.md)
 - 倉庫: [warehouse.md](warehouse.md)
+- データベース定義書: [schema.md](schema.md)
 - 入力の形式: [../jv-data-collector/design.md](../jv-data-collector/design.md)
-- 位置づけ: ローダのプロセス境界と解釈の責務。モジュール分割、自動追随の実装、DDL は未決。完了した生データの更新で PostgreSQL に載せることは [requirements.md](requirements.md) で決まっている。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- 位置づけ: ローダのプロセス境界と解釈の責務。モジュール分割と自動追随の実装は未決。テーブルと有効な版は [schema.md](schema.md)。完了した生データの更新で PostgreSQL に載せることは [requirements.md](requirements.md) で決まっている。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
 
@@ -70,6 +71,6 @@ SQLite は収集アプリが WAL で開く。ローダは同時に読めるこ�
 - ソリューション構成とターゲットフレームワーク
 - 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
 - 完了ファイルをどの単位で読むか（ファイル単位、索引の差分、再解釈）
-- テーブル、主キー、有効な版を示すビューの DDL
-- 特別登録馬の区分 1 と区分 2 の残し方
 - インストール手順、ローダ用ロールの権限、バックアップ
+
+テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [schema.md](schema.md) とする。

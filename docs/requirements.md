@@ -50,7 +50,7 @@
 | DWH ローダ | 完了した生データの更新を契機に、解釈した行を PostgreSQL へ自動で書く | [dwh-loader/requirements.md](dwh-loader/requirements.md) |
 | 予想の実行 | 開始契機の速報が載り終え、フルのデータが揃ったとき、馬券予想モデルを自動で起動する | この文書の 5 |
 
-利用者の操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダが行をどう解釈するかは [dwh-loader/requirements.md](dwh-loader/requirements.md)。完了した生データへ自動で追随する実装（常駐、タスク、監視）は [dwh-loader/architecture.md](dwh-loader/architecture.md)、テーブル定義は [dwh-loader/warehouse.md](dwh-loader/warehouse.md)、予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
+利用者の操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダが行をどう解釈するかは [dwh-loader/requirements.md](dwh-loader/requirements.md)。完了した生データへ自動で追随する実装（常駐、タスク、監視）は [dwh-loader/architecture.md](dwh-loader/architecture.md) の未決、データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)、予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
 
 ## 4. データの流れ
 
@@ -118,4 +118,4 @@ flowchart LR
 9. オッズの周回、払戻、速報マイニング、`0B15` の成績確定後の版、蓄積の差分だけでは予想を開始しない。これらは PostgreSQL には載る。
 10. 投票、購入、収支の計算は行わない。
 
-収集の手順は [jv-data-collector/requirements.md](jv-data-collector/requirements.md) の受入条件を正とする。ローダの手順は [dwh-loader/requirements.md](dwh-loader/requirements.md)。テーブル単位の確認は、DDL が決まるまで未決とする。モデルの式が未定のあいだ、受入で見るのは実行の契機と入力の範囲である。
+収集の手順は [jv-data-collector/requirements.md](jv-data-collector/requirements.md) の受入条件を正とする。ローダの手順は [dwh-loader/requirements.md](dwh-loader/requirements.md)。テーブル単位の確認は、データベース定義書が決まるまで未決とする。モデルの式が未定のあいだ、受入で見るのは実行の契機と入力の範囲である。

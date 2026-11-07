@@ -477,7 +477,7 @@ SDK に含まれる C# の構造体はローダが使う。収集アプリは構
 この章では次を定義しない。
 
 - SQLite のテーブル、インデックス、公開ビューの DDL
-- PostgreSQL のテーブル定義。データベースの採用は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md) を正とする
+- PostgreSQL のテーブル定義。正本は [../dwh-loader/schema.md](../dwh-loader/schema.md)。データベースの採用は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md) を正とする
 - 状態ウィンドウと初回設定の画面項目、操作遷移。並びは [requirements.md](requirements.md)、振る舞いは [design.md](design.md)
 - `IJvGateway` のメソッドシグネチャと、戻り値の内部表現
 - カレンダーの設定ファイル スキーマ。時刻の初期値は [design.md](design.md) の提供タイミングを正とする

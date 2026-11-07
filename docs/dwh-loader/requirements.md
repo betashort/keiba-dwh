@@ -7,6 +7,7 @@
 - 全体の構造: [../architecture.md](../architecture.md)
 - 構造: [architecture.md](architecture.md)
 - 倉庫: [warehouse.md](warehouse.md)
+- データベース定義書: [schema.md](schema.md)
 - 入力の形式: [../jv-data-collector/design.md](../jv-data-collector/design.md)
 
 レコードのバイト定義は公式仕様書を正とする。この文書では再定義しない。
@@ -59,4 +60,4 @@
 6. 収集アプリが raw を完了にしたあと、利用者がローダを起動しなくても、そのファイルから作る行が PostgreSQL に入る。
 7. 馬券予想モデルの起動は行わず、速報の行を書き終えた PostgreSQL を、全体の要求が定める予想の実行が読めるようにする。
 
-テーブル、主キー、区分の残し方は未決である。それらが決まるまで、テーブル単位の受入条件は置かない。未決の一覧は [warehouse.md](warehouse.md) と [architecture.md](architecture.md)。
+テーブル、主キー、区分の残し方は [schema.md](schema.md)。定義書が確定するまで、テーブル単位の受入条件は置かない。
