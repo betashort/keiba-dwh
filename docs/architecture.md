@@ -1,14 +1,14 @@
 # 競馬データ倉庫 アーキテクチャ
 
 - 状態: ドラフト
-- 日付: 2026-11-07
+- 日付: 2026-11-08
 - 要求: [requirements.md](requirements.md)
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
 - ローダの設計: [dwh-loader/design.md](dwh-loader/design.md)
 - PostgreSQL: [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
 - データベース定義書: [dwh-loader/schema.md](dwh-loader/schema.md)
-- 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と画面は収集アプリの設計、テーブル・キー・ビューは [dwh-loader/schema.md](dwh-loader/schema.md)、予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と収集の画面は収集アプリの設計、ローダの画面は [dwh-loader/design.md](dwh-loader/design.md)、テーブル・キー・ビューは [dwh-loader/schema.md](dwh-loader/schema.md)、予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
 
@@ -16,7 +16,7 @@
 
 収集アプリは、ログオン セッションの C# / Windows Forms トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`、プロセスは x86。JV-Link から届いたバイト列を raw に追記し、水位と索引を SQLite に書く。PostgreSQL には接続しない。
 
-DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。起動は実行ファイルの実行であり、ログオン時の登録はしない。プロセスが動いているあいだ、ファイルごとには起動しない。JV-Link は呼ばない。予想モデルは起動しない。
+DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。起動は実行ファイルの実行であり、ログオン時の登録はしない。プロセスが動いているあいだ、ファイルごとには起動しない。状態と設定の窓を持つ。通知領域には置かない。JV-Link は呼ばない。予想モデルは起動しない。
 
 公式 SDK の実体は [reference/](reference/) に置く。収集アプリとローダのどちらにも同梱しない。
 
@@ -48,7 +48,7 @@ flowchart LR
 | --- | --- |
 | スケジュール、水位、可逆保存、常駐、通知領域 | 収集アプリ |
 | 利用規約の同意、サーバとの通信、`cache` と `data`、設定ダイアログ | JV-Link |
-| 推奨キーによる最新行、2023-08-08 前後のフィールド長、速報と確定成績の優先、`0B14` の最新世代、完了した更新の PostgreSQL への自動ロード | DWH ローダ |
+| 推奨キーによる最新行、2023-08-08 前後のフィールド長、速報と確定成績の優先、`0B14` の最新世代、完了した更新の PostgreSQL への自動ロード、状態の窓、設定の窓 | DWH ローダ |
 | 解釈済みの行 | PostgreSQL |
 | 開始契機の速報が載り終えたあとの、フルデータによる馬券予想モデルの起動 | 予想の実行。プロセスの置き方は未決 |
 
@@ -112,7 +112,7 @@ flowchart TB
 | 収集の台帳 | SQLite。WAL。アプリとローダが同時に読める | 同上 |
 | 生データ | 追記フレーム。文字コード変換と項目分割をしない | [jv-data-collector/design.md](jv-data-collector/design.md) |
 | 倉庫 | この PC に入っている PostgreSQL 16 のデータベース `keiba`。サービスは `postgresql-x64-16`、ポートは `5432`。JRA-VAN の JV-Data はスキーマ `jv`。別の競馬データはスキーマを足す | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
-| ローダ | 別プロセスの C#。接続は Npgsql。構造体は SDK の C# 版 | [dwh-loader/architecture.md](dwh-loader/architecture.md) |
+| ローダ | 別プロセスの C#。Windows Forms、x64、`net10.0-windows`。接続は Npgsql。構造体は SDK の C# 版 | [dwh-loader/architecture.md](dwh-loader/architecture.md) |
 | 時刻 | 台帳に残す瞬間は UTC。JV-Link との境界とカレンダーは日本標準時 | 収集アプリの設計 |
 
 ローダのターゲットフレームワーク、プロセス、完了ファイルの読み方は [dwh-loader/design.md](dwh-loader/design.md) で決めた。要求は、プロセスが動いているあいだ、完了した更新がファイルごとの起動なしで PostgreSQL に載ることである。ログオン時の登録はしない。予想を起動するプロセスの置き方は未決である。
@@ -130,7 +130,7 @@ flowchart TB
 | [jv-data-collector/deployment.md](jv-data-collector/deployment.md) | 収集アプリのインストール先、公開、更新、削除 |
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
-| [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、受入条件 |
+| [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、画面、受入条件 |
 | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | この PC に入っている PostgreSQL 16 |
 | [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK。バイト定義の正本は仕様書 |

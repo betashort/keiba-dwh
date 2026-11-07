@@ -23,7 +23,7 @@
 | [jv-data-collector/deployment.md](jv-data-collector/deployment.md) | 収集アプリのインストール先、公開、更新、削除 |
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
-| [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、受入条件 |
+| [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、画面、受入条件 |
 | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | この PC に入っている PostgreSQL 16 を倉庫のサーバにする |
 | [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK の置き場。このリポジトリには含めない。バイト定義の正本は仕様書 |

@@ -1,7 +1,7 @@
 # 競馬データ倉庫 要求
 
 - 状態: ドラフト
-- 日付: 2026-11-07
+- 日付: 2026-11-08
 - 対象: 契約者の PC に JV-Data を残し、完了した生データの更新を PostgreSQL へ自動で載せ、開催日の速報が揃ったときに馬券予想モデルをフルデータで自動実行する一式
 - 構造: [architecture.md](architecture.md)
 - 収集アプリ: [jv-data-collector/requirements.md](jv-data-collector/requirements.md)
@@ -50,7 +50,7 @@
 | DWH ローダ | 完了した生データの更新を契機に、解釈した行を PostgreSQL へ自動で書く | [dwh-loader/requirements.md](dwh-loader/requirements.md) |
 | 予想の実行 | 開始契機の速報が載り終え、フルのデータが揃ったとき、馬券予想モデルを自動で起動する | この文書の 5 |
 
-利用者の操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダが行をどう解釈し、完了した生データへどう追随するかは [dwh-loader/design.md](dwh-loader/design.md)。データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)。予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
+収集アプリの操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダの画面、行の解釈、完了した生データへの追随は [dwh-loader/design.md](dwh-loader/design.md)。データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)。予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
 
 ## 4. データの流れ
 
