@@ -4,6 +4,7 @@
 - 日付: 2026-11-07
 - 要求: [requirements.md](requirements.md)
 - 構造: [architecture.md](architecture.md)
+- 導入: [postgresql.md](postgresql.md)
 - 入力: [../jv-data-collector/design.md](../jv-data-collector/design.md)
 - 正とする仕様: JV-Data 仕様書 Ver.4.9.0.1 のフォーマットシート。推奨キーは列「キー」の `○`。`●` は時系列オッズを使うときの追加キー
 - 位置づけ: スキーマ `jv` のテーブル、列、主キー、索引、有効な版のビュー。項目のバイト位置と繰り返し回数は仕様書を正とし、この文書では再定義しない
@@ -107,82 +108,82 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 ## 6. テーブル
 
-親の物理名はレコード種別の小文字である。子は親の名前に内容を足す。子テーブルの主キーは、親の主キーに子のキーを足したものである。
+親の物理名は、中身が読める名前にする。種別 ID は一覧の「種別」に残し、物理名にはしない。子は親の名前に内容を足す。子テーブルの主キーは、親の主キーに子のキーを足したものである。
 
 ### 6.1 一覧
 
-| 物理名 | 種別 | 形 | 主キーに足す列 |
-| --- | --- | --- | --- |
-| `tk` | `TK` | 競走 | |
-| `ra` | `RA` | 競走 | |
-| `hr` | `HR` | 競走 | |
-| `h1` | `H1` | 競走 | |
-| `h6` | `H6` | 競走 | |
-| `o1` | `O1` | 競走 | 発表月日時分 |
-| `o2` | `O2` | 競走 | 発表月日時分 |
-| `o3` | `O3` | 競走 | 発表月日時分 |
-| `o4` | `O4` | 競走 | 発表月日時分 |
-| `o5` | `O5` | 競走 | 発表月日時分 |
-| `o6` | `O6` | 競走 | 発表月日時分 |
-| `dm` | `DM` | 競走 | |
-| `tm` | `TM` | 競走 | |
-| `wh` | `WH` | 競走 | 発表月日時分 |
-| `tc` | `TC` | 競走 | |
-| `cc` | `CC` | 競走 | |
-| `se` | `SE` | 競走と馬 | |
-| `av` | `AV` | 競走と馬番 | |
-| `jc` | `JC` | 競走と馬番 | |
-| `ys` | `YS` | 開催日と場回日 | |
-| `we` | `WE` | 開催日と場回日 | |
-| `wf` | `WF` | 開催日 | |
-| `um` | `UM` | 血統登録番号 | |
-| `sk` | `SK` | 血統登録番号 | |
-| `hy` | `HY` | 血統登録番号 | |
-| `ks` | `KS` | コード | |
-| `ch` | `CH` | コード | |
-| `br` | `BR` | コード | |
-| `bn` | `BN` | コード | |
-| `hn` | `HN` | コード | |
-| `hc` | `HC` | 調教 | |
-| `wc` | `WC` | 調教 | |
-| `hs` | `HS` | 取引 | |
-| `cs` | `CS` | コース | |
-| `rc` | `RC` | レコード | |
-| `jg` | `JG` | 除外 | |
-| `bt` | `BT` | 系統 | |
-| `ck` | `CK` | 仕様の推奨キー | |
+| 物理名 | 意味 | 種別 | 形 | 主キーに足す列 |
+| --- | --- | --- | --- | --- |
+| `special_entry` | 特別登録馬 | `TK` | 競走 | |
+| `race` | レース詳細 | `RA` | 競走 | |
+| `payout` | 払戻 | `HR` | 競走 | |
+| `hyosu` | 票数（3連単以外） | `H1` | 競走 | |
+| `hyosu_sanrentan` | 票数（3連単） | `H6` | 競走 | |
+| `odds_tanpuku` | 単勝・複勝・枠連オッズ | `O1` | 競走 | 発表月日時分 |
+| `odds_umaren` | 馬連オッズ | `O2` | 競走 | 発表月日時分 |
+| `odds_wide` | ワイドオッズ | `O3` | 競走 | 発表月日時分 |
+| `odds_umatan` | 馬単オッズ | `O4` | 競走 | 発表月日時分 |
+| `odds_sanrenpuku` | 3連複オッズ | `O5` | 競走 | 発表月日時分 |
+| `odds_sanrentan` | 3連単オッズ | `O6` | 競走 | 発表月日時分 |
+| `mining_time` | タイム型マイニング | `DM` | 競走 | |
+| `mining_match` | 対戦型マイニング | `TM` | 競走 | |
+| `weight` | 馬体重 | `WH` | 競走 | 発表月日時分 |
+| `post_time_change` | 発走時刻変更 | `TC` | 競走 | |
+| `course_change` | コース変更 | `CC` | 競走 | |
+| `race_horse` | 馬毎レース情報 | `SE` | 競走と馬 | |
+| `entry_cancel` | 出走取消・競走除外 | `AV` | 競走と馬番 | |
+| `jockey_change` | 騎手変更 | `JC` | 競走と馬番 | |
+| `schedule` | 開催スケジュール | `YS` | 開催日と場回日 | |
+| `weather` | 天候馬場状態 | `WE` | 開催日と場回日 | |
+| `win5` | 重勝式 | `WF` | 開催日 | |
+| `horse` | 競走馬マスタ | `UM` | 血統登録番号 | |
+| `offspring` | 産駒マスタ | `SK` | 血統登録番号 | |
+| `name_origin` | 馬名の意味由来 | `HY` | 血統登録番号 | |
+| `jockey` | 騎手マスタ | `KS` | コード | |
+| `trainer` | 調教師マスタ | `CH` | コード | |
+| `breeder` | 生産者マスタ | `BR` | コード | |
+| `owner` | 馬主マスタ | `BN` | コード | |
+| `breeding_horse` | 繁殖馬マスタ | `HN` | コード | |
+| `slope_training` | 坂路調教 | `HC` | 調教 | |
+| `wood_training` | ウッドチップ調教 | `WC` | 調教 | |
+| `market_price` | 市場取引価格 | `HS` | 取引 | |
+| `course` | コース情報 | `CS` | コース | |
+| `race_record` | レコードマスタ | `RC` | レコード | |
+| `exclusion` | 競走馬除外 | `JG` | 除外 | |
+| `bloodline` | 系統情報 | `BT` | 系統 | |
+| `chakudo` | 出走別着度数 | `CK` | 仕様の推奨キー | |
 
 ### 6.2 子テーブル
 
 | 親 | 子 | 子のキー |
 | --- | --- | --- |
-| `tk` | `tk_horse` | 連番。血統登録番号を列に持つ |
-| `ra` | `ra_corner` | コーナー番号 |
-| `se` | `se_rival` | 1 着馬から 3 頭まで。空は入れない |
-| `hr` | `hr_pay` | 式別 + 並び順 |
-| `h1` | `h1_hyo` | 式別 + 組番 |
-| `h6` | `h6_hyo` | 組番 |
-| `o1` | `o1_tan` `o1_fuku` `o1_waku` | 馬番または組番 |
-| `o2` | `o2_kumi` | 組番 |
-| `o3` | `o3_kumi` | 組番 |
-| `o4` | `o4_kumi` | 組番 |
-| `o5` | `o5_kumi` | 組番 |
-| `o6` | `o6_kumi` | 組番 |
-| `um` | `um_pedigree` `um_place` | 血統の枠、着回数の区分と枠 |
-| `dm` | `dm_horse` | 馬番 |
-| `tm` | `tm_horse` | 馬番 |
-| `wh` | `wh_horse` | 馬番 |
-| `wf` | `wf_race` `wf_pay` | 対象順、払戻の並び |
-| `ys` | `ys_grade` | 特別競走番号 |
-| `bt` | `bt_node` | 仕様の系譜位置 |
+| `special_entry` | `special_entry_horse` | 連番。血統登録番号を列に持つ |
+| `race` | `race_corner` | コーナー番号 |
+| `race_horse` | `race_horse_rival` | 1 着馬から 3 頭まで。空は入れない |
+| `payout` | `payout_line` | 式別 + 並び順 |
+| `hyosu` | `hyosu_line` | 式別 + 組番 |
+| `hyosu_sanrentan` | `hyosu_sanrentan_line` | 組番 |
+| `odds_tanpuku` | `odds_tanpuku_tan` `odds_tanpuku_fuku` `odds_tanpuku_waku` | 馬番または組番 |
+| `odds_umaren` | `odds_umaren_kumi` | 組番 |
+| `odds_wide` | `odds_wide_kumi` | 組番 |
+| `odds_umatan` | `odds_umatan_kumi` | 組番 |
+| `odds_sanrenpuku` | `odds_sanrenpuku_kumi` | 組番 |
+| `odds_sanrentan` | `odds_sanrentan_kumi` | 組番 |
+| `horse` | `horse_pedigree` `horse_finish_count` | 血統の枠、着回数の区分と枠 |
+| `mining_time` | `mining_time_horse` | 馬番 |
+| `mining_match` | `mining_match_horse` | 馬番 |
+| `weight` | `weight_horse` | 馬番 |
+| `win5` | `win5_race` `win5_payout` | 対象順、払戻の並び |
+| `schedule` | `schedule_grade` | 特別競走番号 |
+| `bloodline` | `bloodline_node` | 仕様の系譜位置 |
 
-`h6` と `o6` は組が多い。初期値の組を除いても、確定週は行数が大きい。親 1 行に対する子として置き、予想の最新オッズは `v_o6_latest` だけを読む。
+`hyosu_sanrentan` と `odds_sanrentan` は組が多い。初期値の組を除いても、確定週は行数が大きい。親 1 行に対する子として置き、予想の最新オッズは `v_odds_sanrentan_latest` だけを読む。
 
 ### 6.3 配列列
 
-`ra` の本賞金・付加賞金・ラップタイム、`um` と `ck` の着回数のうち枠が固定で位置が意味を持つものは `integer[]` または `numeric[]` とする。`ck` は 1 レコードが競走馬・騎手・調教師・馬主・生産者の着回数ブロックを持つ。ブロックごとに列を分け、子テーブルにはしない。
+`race` の本賞金・付加賞金・ラップタイム、`horse` と `chakudo` の着回数のうち枠が固定で位置が意味を持つものは `integer[]` または `numeric[]` とする。`chakudo` は 1 レコードが競走馬・騎手・調教師・馬主・生産者の着回数ブロックを持つ。ブロックごとに列を分け、子テーブルにはしない。
 
-### 6.4 列の見本（`jv.se`）
+### 6.4 列の見本（`jv.race_horse`）
 
 他の親は、形の列をこの 3 列と入れ替え、項目列をそのレコードの仕様に替える。共通列はそのままである。
 
@@ -200,8 +201,8 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 | 物理名 | テーブル | 列 |
 | --- | --- | --- |
-| `se_ketto` | `se` | `ketto_num`, `make_date` |
-| `se_race` | `se` | `race_key`, `data_kubun` |
+| `race_horse_ketto` | `race_horse` | `ketto_num`, `make_date` |
+| `race_horse_race` | `race_horse` | `race_key`, `data_kubun` |
 
 `meeting_date` は `race_key` の先頭 8 桁からビュー側で date にする。開催日の範囲で読むビューは、その式にインデックスが要る段階で生成列を足す。
 
@@ -211,34 +212,34 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 | ビュー | 親 |
 | --- | --- |
-| `v_ra_program` `v_se_program` | `ra` `se` |
-| `v_ra_result` `v_se_result` | `ra` `se` |
-| `v_se_local` | `se` |
-| `v_o1_latest` から `v_o6_latest` | `o1` から `o6` |
-| `v_o1_final` から `v_o6_final` | `o1` から `o6` |
-| `v_h1_final` `v_h6_final` | `h1` `h6` |
-| `v_hr` | `hr` |
-| `v_dm` `v_tm` | `dm` `tm` |
-| `v_wf` | `wf` |
-| `v_tk` | `tk` |
-| `v_um` `v_ch` `v_ks` `v_bn` `v_br` | `um` `ch` `ks` `bn` `br` |
-| `v_wh` | `wh` |
-| `v_jc` `v_av` `v_tc` `v_we` `v_cc` | `jc` `av` `tc` `we` `cc` |
-| `v_ys` | `ys` |
+| `v_race_program` `v_race_horse_program` | `race` `race_horse` |
+| `v_race_result` `v_race_horse_result` | `race` `race_horse` |
+| `v_race_horse_local` | `race_horse` |
+| `v_odds_tanpuku_latest` から `v_odds_sanrentan_latest` | `odds_tanpuku` から `odds_sanrentan` |
+| `v_odds_tanpuku_final` から `v_odds_sanrentan_final` | `odds_tanpuku` から `odds_sanrentan` |
+| `v_hyosu_final` `v_hyosu_sanrentan_final` | `hyosu` `hyosu_sanrentan` |
+| `v_payout` | `payout` |
+| `v_mining_time` `v_mining_match` | `mining_time` `mining_match` |
+| `v_win5` | `win5` |
+| `v_special_entry` | `special_entry` |
+| `v_horse` `v_trainer` `v_jockey` `v_owner` `v_breeder` | `horse` `trainer` `jockey` `owner` `breeder` |
+| `v_weight` | `weight` |
+| `v_jockey_change` `v_entry_cancel` `v_post_time_change` `v_weather` `v_course_change` | `jockey_change` `entry_cancel` `post_time_change` `weather` `course_change` |
+| `v_schedule` | `schedule` |
 
 ### 7.1 `RA` と `SE`
 
 データ区分は段階である。番組は `1` 出走馬名表、`2` 出馬表。成績は `3` から `6` が速報の確定段階、`7` が月曜の確定成績。`A` と `B` は地方と海外国際で、`DIFF` / `DIFN` に入る。`9` は中止、`0` は削除。
 
-`v_se_result` の粒度は `race_key`、馬番、血統登録番号の 1 行である。`v_ra_result` の粒度は `race_key` の 1 行である。番組ビューも同じ粒度で、区分の採り方が次の表になる。
+`v_race_horse_result` の粒度は `race_key`、馬番、血統登録番号の 1 行である。`v_race_result` の粒度は `race_key` の 1 行である。番組ビューも同じ粒度で、区分の採り方が次の表になる。
 
 | ビュー | 採る行 |
 | --- | --- |
-| `v_ra_program` `v_se_program` | 区分 `2` を `1` より先。同じ区分では `0B15` を `RACE` より先。そのあと作成年月日、取得時刻 |
-| `v_ra_result` `v_se_result` | `RACE` の区分 `7` を最優先にする。無ければ区分 `6` `5` `4` `3` の順。同じ区分では `RACE`、`0B12`、`0B15` の順。そのあと作成年月日、取得時刻 |
-| `v_se_local` | 区分 `A` と `B`。作成年月日、取得時刻 |
+| `v_race_program` `v_race_horse_program` | 区分 `2` を `1` より先。同じ区分では `0B15` を `RACE` より先。そのあと作成年月日、取得時刻 |
+| `v_race_result` `v_race_horse_result` | `RACE` の区分 `7` を最優先にする。無ければ区分 `6` `5` `4` `3` の順。同じ区分では `RACE`、`0B12`、`0B15` の順。そのあと作成年月日、取得時刻 |
+| `v_race_horse_local` | 区分 `A` と `B`。作成年月日、取得時刻 |
 
-確定成績が速報より古い作成年月日でも、`RACE` の区分 `7` を有効にする。番組の変更は `0B15` が先に届くので、同じ区分では速報を蓄積より先にする。中止 `9` は、それより新しい番組区分が無いとき `v_*_program` の行になる。
+確定成績が速報より古い作成年月日でも、`RACE` の区分 `7` を有効にする。番組の変更は `0B15` が先に届くので、同じ区分では速報を蓄積より先にする。中止 `9` は、それより新しい番組区分が無いとき `v_race_program` と `v_race_horse_program` の行になる。
 
 `SE` の推奨キーは馬番と血統登録番号を含む。番号が変わった馬は別キーとして残る。
 
@@ -246,16 +247,16 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 | ビュー | 採る行 |
 | --- | --- |
-| `v_o1_latest` から `v_o6_latest` | 区分 `1` `2` `3` のうち発表月日時分が新しいもの。予想が読む最新オッズ |
-| `v_o1_final` から `v_o6_final` | 区分 `4` を `5` より先。確定オッズ |
-| `v_h1_final` `v_h6_final` | 区分 `4` を `5` より先 |
-| `v_hr` | 区分 `2` を `1` より先。月曜の確定払戻を速報より先にする |
-| `v_dm` `v_tm` | 区分 `7`、`3`、`2`、`1` の順。月曜の蓄積が無い開催日は直前予想 `3` が有効になる |
-| `v_wf` | 区分 `7`、`3`、`2`、`1` の順 |
+| `v_odds_tanpuku_latest` から `v_odds_sanrentan_latest` | 区分 `1` `2` `3` のうち発表月日時分が新しいもの。予想が読む最新オッズ |
+| `v_odds_tanpuku_final` から `v_odds_sanrentan_final` | 区分 `4` を `5` より先。確定オッズ |
+| `v_hyosu_final` `v_hyosu_sanrentan_final` | 区分 `4` を `5` より先 |
+| `v_payout` | 区分 `2` を `1` より先。月曜の確定払戻を速報より先にする |
+| `v_mining_time` `v_mining_match` | 区分 `7`、`3`、`2`、`1` の順。月曜の蓄積が無い開催日は直前予想 `3` が有効になる |
+| `v_win5` | 区分 `7`、`3`、`2`、`1` の順 |
 
 `DM` と `TM` は、蓄積の区分 `7` のあとでも速報には区分 `3` が残る。ビューは蓄積の `7` を有効にする。
 
-`v_wh` は競走あたり、発表月日時分が新しい 1 行である。
+`v_weight` は競走あたり、発表月日時分が新しい 1 行である。
 
 ### 7.3 `0B14`
 
@@ -265,13 +266,13 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 ### 7.4 特別登録馬
 
-`TK` の区分 `1`（ハンデ発表前）と区分 `2`（ハンデ発表後）は、同じ競走キーの別の版として両方残す。主キーにデータ区分を含める。`v_tk` は区分 `0` を除き、区分ごとに作成年月日が新しい行を返す。予想のフルデータには含めない。蓄積として残す。
+`TK` の区分 `1`（ハンデ発表前）と区分 `2`（ハンデ発表後）は、同じ競走キーの別の版として両方残す。主キーにデータ区分を含める。`v_special_entry` は区分 `0` を除き、区分ごとに作成年月日が新しい行を返す。予想のフルデータには含めない。蓄積として残す。
 
 ### 7.5 マスタと調教
 
 `UM` `KS` `CH` `BR` `BN` `HN` `SK` `HY` `BT` `CS` `HS` `HC` `WC` `CK` `YS` `RC` `JG` の有効行は、削除区分 `0` を除いた最新の作成年月日である。`UM` の区分 `9` は抹消として有効行に残す。`YS` は区分 `3`、`2`、`1` の順で、中止 `9` は新しい開催予定が無いとき有効にする。
 
-この節でビュー名があるのは、予想が読む `v_um` `v_ch` `v_ks` `v_bn` `v_br` `v_ys` である。残りの種別も同じ規則で有効行を決める。ビューの物理名は、読む相手が決まったときに上の一覧へ足す。
+この節でビュー名があるのは、予想が読む `v_horse` `v_trainer` `v_jockey` `v_owner` `v_breeder` `v_schedule` である。残りの種別も同じ規則で有効行を決める。ビューの物理名は、読む相手が決まったときに上の一覧へ足す。
 
 ## 8. 予想が読むビュー
 
@@ -279,15 +280,15 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 | フルデータの項目 | ビュー |
 | --- | --- |
-| 出走馬のマスタ | `v_um`。調教師・騎手・馬主・生産者は `v_ch` `v_ks` `v_bn` `v_br` |
-| 過去走 | `v_se_result` と `v_se_local`。対象馬の血統登録番号で引く |
-| 番組 | `v_ra_program` と `v_se_program` |
-| 確定している成績 | `v_se_result` と `v_ra_result` |
-| 馬体重 | `v_wh` |
-| 変更、出走取消、発走、天候馬場、コース | `v_jc` `v_av` `v_tc` `v_we` `v_cc`。いずれも `ob14_active` を満たす行 |
-| 出馬と開催 | `v_se_program` `v_ra_program` `v_ys` |
-| 速報マイニング | `v_dm` `v_tm` |
-| 最新オッズ | `v_o1_latest` から `v_o6_latest` |
+| 出走馬のマスタ | `v_horse`。調教師・騎手・馬主・生産者は `v_trainer` `v_jockey` `v_owner` `v_breeder` |
+| 過去走 | `v_race_horse_result` と `v_race_horse_local`。対象馬の血統登録番号で引く |
+| 番組 | `v_race_program` と `v_race_horse_program` |
+| 確定している成績 | `v_race_horse_result` と `v_race_result` |
+| 馬体重 | `v_weight` |
+| 変更、出走取消、発走、天候馬場、コース | `v_jockey_change` `v_entry_cancel` `v_post_time_change` `v_weather` `v_course_change`。いずれも `ob14_active` を満たす行 |
+| 出馬と開催 | `v_race_horse_program` `v_race_program` `v_schedule` |
+| 速報マイニング | `v_mining_time` `v_mining_match` |
+| 最新オッズ | `v_odds_tanpuku_latest` から `v_odds_sanrentan_latest` |
 
 払戻、票数、確定オッズ、`WF`、調教、血統、市場、馬名由来は倉庫に載せる。予想の開始契機には使わない。
 
@@ -306,9 +307,9 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 ## 10. 今回決めないこと
 
 - ローダのプロセスの置き方と、完了ファイルへの追随の実装
-- インストール、ロール、バックアップ
+- ローダ用ロールの権限、バックアップ。導入手順は [postgresql.md](postgresql.md)
 - コード表の名称テーブル
 - 予想の特徴量テーブルと結果の保存先
 - 台帳 3 テーブルの物理名、型、主キー
 - 発表月日時分の物理名
-- `se` 以外の索引。開催日で読むための生成列
+- `race_horse` 以外の索引。開催日で読むための生成列

@@ -10,7 +10,6 @@
 - デプロイ: [deployment.md](deployment.md)
 - マニュアル: [manual.md](manual.md)
 - ローダ: [../dwh-loader/requirements.md](../dwh-loader/requirements.md)
-- 倉庫: [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)
 
 レコードのバイト定義は公式仕様書を正とする。この文書では再定義しない。
 

@@ -9,7 +9,6 @@
 - デプロイ: [deployment.md](deployment.md)
 - マニュアル: [manual.md](manual.md)
 - ローダ: [../dwh-loader/architecture.md](../dwh-loader/architecture.md)
-- 倉庫: [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)
 - 位置づけ: プロセスとモジュールの構造。取得手順、対象データ、保存形式、画面の振る舞い、受入条件は [design.md](design.md)。インストール先と更新は [deployment.md](deployment.md)。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
@@ -434,7 +433,7 @@ sequenceDiagram
 
 - 完了前のファイルをローダ向けの索引に出さない
 - 未知のレコード種別 ID を落としたり、取得を止めたりしない
-- 倉庫のテーブルや接続を知らない。接続先の PostgreSQL は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md) の決定に従い、ローダだけが使う
+- 倉庫のテーブルや接続を知らない。PostgreSQL はローダだけが使う
 
 ## 11. 技術選定
 
@@ -477,7 +476,7 @@ SDK に含まれる C# の構造体はローダが使う。収集アプリは構
 この章では次を定義しない。
 
 - SQLite のテーブル、インデックス、公開ビューの DDL
-- PostgreSQL のテーブル定義。正本は [../dwh-loader/schema.md](../dwh-loader/schema.md)。データベースの採用は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md) を正とする
+- PostgreSQL のテーブル定義。正本は [../dwh-loader/schema.md](../dwh-loader/schema.md)。導入は [../dwh-loader/postgresql.md](../dwh-loader/postgresql.md)
 - ホーム、状態ウィンドウ、初回設定の画面項目と操作遷移。並びは [requirements.md](requirements.md)、振る舞いは [design.md](design.md)
 - `IJvGateway` のメソッドシグネチャと、戻り値の内部表現
 - カレンダーの設定ファイル スキーマ。時刻の初期値は [design.md](design.md) の提供タイミングを正とする

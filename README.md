@@ -30,7 +30,7 @@ src/JvDataCollector/   収集アプリ（C# / Windows Forms / x86 / net10.0-wind
 
 ## ビルド
 
-収集アプリは日本語版 Windows 11、.NET 10、公式の JV-Link 5.0.0（32bit）を前提にする。JV-Link は利用者が別に導入する。
+収集アプリは日本語版 Windows 11、.NET 10、公式の JV-Link 5.0.0（32bit）を前提にする。JV-Link は利用者が別に導入する。PostgreSQL 18 の導入は [docs/dwh-loader/postgresql.md](docs/dwh-loader/postgresql.md)。
 
 ```powershell
 dotnet build src/JvDataCollector/JvDataCollector.slnx

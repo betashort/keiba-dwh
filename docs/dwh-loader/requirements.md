@@ -6,7 +6,7 @@
 - 全体の要求: [../requirements.md](../requirements.md)
 - 全体の構造: [../architecture.md](../architecture.md)
 - 構造: [architecture.md](architecture.md)
-- 倉庫: [warehouse.md](warehouse.md)
+- PostgreSQL: [postgresql.md](postgresql.md)
 - データベース定義書: [schema.md](schema.md)
 - 入力の形式: [../jv-data-collector/design.md](../jv-data-collector/design.md)
 
@@ -40,7 +40,7 @@
 
 読む場所は `DataRoot\raw` と `DataRoot\state\ledger.sqlite` だけである。フレームの並びと台帳の中身は、収集アプリの設計のランディングを正とする。
 
-接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。PostgreSQL は収集アプリと同じ PC で動かす。採用の理由は [warehouse.md](warehouse.md)。
+接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。PostgreSQL は収集アプリと同じ PC で動かす。導入は [postgresql.md](postgresql.md)。
 
 ## 3. 守ること
 

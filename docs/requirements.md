@@ -6,7 +6,7 @@
 - 構造: [architecture.md](architecture.md)
 - 収集アプリ: [jv-data-collector/requirements.md](jv-data-collector/requirements.md)
 - ローダ: [dwh-loader/requirements.md](dwh-loader/requirements.md)
-- 倉庫: [dwh-loader/warehouse.md](dwh-loader/warehouse.md)
+- PostgreSQL: [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
 
 レコードのバイト定義は公式仕様書を正とする。この文書では再定義しない。予想モデルの式、特徴量、学習手順、結果の保存先は、ここでは定めない。
 
@@ -103,7 +103,7 @@ flowchart LR
 - ローダは、完了した生データの更新に追随する。利用者はファイルごと、速報ごとにローダを起動しない。
 - 予想の入力は、実行時点の PostgreSQL にある対象レースのフルのデータである。
 
-再試行、残量、フレーム形式、台帳の中身は [jv-data-collector/design.md](jv-data-collector/design.md)。データベースの採用は [dwh-loader/warehouse.md](dwh-loader/warehouse.md)。
+再試行、残量、フレーム形式、台帳の中身は [jv-data-collector/design.md](jv-data-collector/design.md)。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 
 ## 7. できていると言える条件
 

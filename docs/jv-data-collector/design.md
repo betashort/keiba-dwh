@@ -9,7 +9,6 @@
 - デプロイ: [deployment.md](deployment.md)
 - マニュアル: [manual.md](manual.md)
 - ローダ: [../dwh-loader/requirements.md](../dwh-loader/requirements.md)
-- 倉庫: [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)
 - 正とする公式版:
   - [JV-Data 仕様書 Ver.4.9.0.1](https://jra-van.jp/dlb/sdv/sdk/JV-Data4901.pdf)（2024-08-07）
   - [JV-Link インターフェース仕様書 Ver.4.9.0.1](https://jra-van.jp/dlb/sdv/sdk/JV-Link4901.pdf)（2024-08-07）
@@ -41,7 +40,7 @@
 - 言語は C#。UI は Windows Forms。プロセスは x86。
 - ターゲットフレームワークは `net10.0-windows`。.NET 8 以降のうち、現行 LTS の .NET 10 を使う。
 - ログオン起動のトレイ常駐。ビット数は公式の 32bit JV-Link に合わせる。
-- 倉庫データベースは PostgreSQL。書くのは倉庫ローダだけで、収集アプリは接続しない。詳細は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)。
+- 倉庫データベースは PostgreSQL。書くのは倉庫ローダだけで、収集アプリは接続しない。導入は [../dwh-loader/postgresql.md](../dwh-loader/postgresql.md)。
 - 収集アプリの正本はローカル raw と SQLite。倉庫の PostgreSQL へは直接書かない。
 - 初回の全期間取得は利用者の開始操作だけ。定期実行は option = 1。
 - 速報は、出走馬名表からのレース情報、馬体重、開催情報、速報マイニングを発表に合わせて取る。オッズは 3 分間隔の 1 周。変更系は `JVWatchEvent`。
@@ -328,7 +327,7 @@ SQLite に次を持つ。
 - 2023-08-08 を境にしたフィールド長の違い
 - `RACE` の確定成績と、`0B12` / `0B15` の速報の優先順位
 - `0B14` の最新世代だけを有効にすること
-- 解釈済みの行を PostgreSQL へ書くこと。データベースの決定は [../dwh-loader/warehouse.md](../dwh-loader/warehouse.md)
+- 解釈済みの行を PostgreSQL へ書くこと。導入は [../dwh-loader/postgresql.md](../dwh-loader/postgresql.md)
 
 ## 9. 非機能
 

@@ -5,7 +5,7 @@
 - 要求: [requirements.md](requirements.md)
 - 全体の要求: [../requirements.md](../requirements.md)
 - 全体の構造: [../architecture.md](../architecture.md)
-- 倉庫: [warehouse.md](warehouse.md)
+- PostgreSQL: [postgresql.md](postgresql.md)
 - データベース定義書: [schema.md](schema.md)
 - 入力の形式: [../jv-data-collector/design.md](../jv-data-collector/design.md)
 - 位置づけ: ローダのプロセス境界と解釈の責務。モジュール分割と自動追随の実装は未決。テーブルと有効な版は [schema.md](schema.md)。完了した生データの更新で PostgreSQL に載せることは [requirements.md](requirements.md) で決まっている。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
@@ -60,17 +60,15 @@ SQLite は収集アプリが WAL で開く。ローダは同時に読めるこ�
 | 言語 | C# |
 | プロセス | 収集アプリの外。COM と Windows Forms を前提にしない |
 | 接続 | Npgsql |
-| 倉庫 | PostgreSQL。メジャー版は導入時の安定版とし、この文書では番号を固定しない |
+| 倉庫 | PostgreSQL 18。導入は [postgresql.md](postgresql.md) |
 | 構造体 | SDK の C# 版。収集アプリは使わない |
 | 秘密 | 利用キーは持たない。データベース認証はローダの設定に置く |
-
-データベースを PostgreSQL にした理由は [warehouse.md](warehouse.md)。
 
 ## 5. 未決
 
 - ソリューション構成とターゲットフレームワーク
 - 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
 - 完了ファイルをどの単位で読むか（ファイル単位、索引の差分、再解釈）
-- インストール手順、ローダ用ロールの権限、バックアップ
+- ローダ用ロールの権限、バックアップ。導入手順は [postgresql.md](postgresql.md)
 
 テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [schema.md](schema.md) とする。

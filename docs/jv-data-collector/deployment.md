@@ -205,7 +205,7 @@ Run のパスは変えない。インストール先にバージョン番号の�
 | フレームワーク依存の公開 | .NET 10 デスクトップ ランタイムの導入が、JV-Link と別に必要になる |
 | 自動更新 | 取得中にファイルを差し替え得る。差し替えは「終了」のあと、[手元のコマンド](#手元のコマンド) でインストール先をミラーする |
 | インストーラ、署名、配信サーバ | 契約者本人の PC へ、手元の公開結果をコピーする |
-| ローダと PostgreSQL の導入 | ローダのインストールは [../architecture.md](../architecture.md) の未決 |
+| ローダのインストール | [../architecture.md](../architecture.md) の未決。PostgreSQL の導入は [../dwh-loader/postgresql.md](../dwh-loader/postgresql.md) |
 
 ## 9. 決定一覧
 

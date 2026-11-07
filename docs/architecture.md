@@ -5,7 +5,7 @@
 - 要求: [requirements.md](requirements.md)
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
-- 倉庫: [dwh-loader/warehouse.md](dwh-loader/warehouse.md)
+- PostgreSQL: [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
 - データベース定義書: [dwh-loader/schema.md](dwh-loader/schema.md)
 - 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と画面は収集アプリの設計、テーブル・キー・ビューは [dwh-loader/schema.md](dwh-loader/schema.md)、予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
@@ -101,7 +101,7 @@ flowchart TB
 
 収集アプリのバイナリの置き場所と更新は [jv-data-collector/deployment.md](jv-data-collector/deployment.md)。
 
-PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/warehouse.md](dwh-loader/warehouse.md)。
+PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 
 ## 5. 技術選定
 
@@ -110,7 +110,7 @@ PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/wareh
 | 収集アプリ | C#、Windows Forms、x86、`net10.0-windows` | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) |
 | 収集の台帳 | SQLite。WAL。アプリとローダが同時に読める | 同上 |
 | 生データ | 追記フレーム。文字コード変換と項目分割をしない | [jv-data-collector/design.md](jv-data-collector/design.md) |
-| 倉庫 | PostgreSQL。ライセンスは PostgreSQL License | [dwh-loader/warehouse.md](dwh-loader/warehouse.md) |
+| 倉庫 | PostgreSQL 18。ライセンスは PostgreSQL License | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
 | ローダ | 別プロセスの C#。接続は Npgsql。構造体は SDK の C# 版 | [dwh-loader/architecture.md](dwh-loader/architecture.md) |
 | 時刻 | 台帳に残す瞬間は UTC。JV-Link との境界とカレンダーは日本標準時 | 収集アプリの設計 |
 
@@ -129,13 +129,13 @@ PostgreSQL の採用理由と、採用しなかった候補は [dwh-loader/wareh
 | [jv-data-collector/deployment.md](jv-data-collector/deployment.md) | 収集アプリのインストール先、公開、更新、削除 |
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
-| [dwh-loader/warehouse.md](dwh-loader/warehouse.md) | PostgreSQL の採用 |
+| [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | PostgreSQL 18 の導入 |
 | [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK。バイト定義の正本は仕様書 |
 
 ## 7. 未決
 
-- ローダのインストール、ロールの権限、バックアップ
+- ローダのインストール、ロールの権限、バックアップ。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
 - 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
 - 馬券予想モデルを起動するプロセスの置き方。契機と入力は [requirements.md](requirements.md)
 - ローダのターゲットフレームワーク
