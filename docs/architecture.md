@@ -5,6 +5,7 @@
 - 要求: [requirements.md](requirements.md)
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
+- ローダの設計: [dwh-loader/design.md](dwh-loader/design.md)
 - PostgreSQL: [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
 - データベース定義書: [dwh-loader/schema.md](dwh-loader/schema.md)
 - 位置づけ: 収集アプリとローダの境界、および予想実行との契約。取得手順と画面は収集アプリの設計、テーブル・キー・ビューは [dwh-loader/schema.md](dwh-loader/schema.md)、予想プロセスの置き方は未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
@@ -15,7 +16,7 @@
 
 収集アプリは、ログオン セッションの C# / Windows Forms トレイ アプリ 1 プロセスである。ターゲットフレームワークは `net10.0-windows`、プロセスは x86。JV-Link から届いたバイト列を raw に追記し、水位と索引を SQLite に書く。PostgreSQL には接続しない。
 
-DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。利用者はそのたび起動しない。JV-Link は呼ばない。予想モデルは起動しない。
+DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。起動は実行ファイルの実行であり、ログオン時の登録はしない。プロセスが動いているあいだ、ファイルごとには起動しない。JV-Link は呼ばない。予想モデルは起動しない。
 
 公式 SDK の実体は [reference/](reference/) に置く。収集アプリとローダのどちらにも同梱しない。
 
@@ -110,11 +111,11 @@ PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 | 収集アプリ | C#、Windows Forms、x86、`net10.0-windows` | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) |
 | 収集の台帳 | SQLite。WAL。アプリとローダが同時に読める | 同上 |
 | 生データ | 追記フレーム。文字コード変換と項目分割をしない | [jv-data-collector/design.md](jv-data-collector/design.md) |
-| 倉庫 | PostgreSQL 18。ライセンスは PostgreSQL License | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
+| 倉庫 | PostgreSQL 18 のデータベース `keiba`。JRA-VAN の JV-Data はスキーマ `jv`。別の競馬データはスキーマを足す | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
 | ローダ | 別プロセスの C#。接続は Npgsql。構造体は SDK の C# 版 | [dwh-loader/architecture.md](dwh-loader/architecture.md) |
 | 時刻 | 台帳に残す瞬間は UTC。JV-Link との境界とカレンダーは日本標準時 | 収集アプリの設計 |
 
-ローダのターゲットフレームワーク、プロセスの置き方、完了した生データへ自動で追随する実装は未決である。要求は、完了した更新が利用者の起動なしで PostgreSQL に載ることである。予想を起動するプロセスの置き方も未決である。
+ローダのターゲットフレームワーク、プロセス、完了ファイルの読み方は [dwh-loader/design.md](dwh-loader/design.md) で決めた。要求は、プロセスが動いているあいだ、完了した更新がファイルごとの起動なしで PostgreSQL に載ることである。ログオン時の登録はしない。予想を起動するプロセスの置き方は未決である。
 
 ## 6. 文書の分担
 
@@ -129,15 +130,14 @@ PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 | [jv-data-collector/deployment.md](jv-data-collector/deployment.md) | 収集アプリのインストール先、公開、更新、削除 |
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
+| [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、受入条件 |
 | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | PostgreSQL 18 の導入 |
 | [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK。バイト定義の正本は仕様書 |
 
 ## 7. 未決
 
-- ローダのインストール、ロールの権限、バックアップ。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)
-- 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
+- バックアップとリストア。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。ローダのプロセスと権限は [dwh-loader/design.md](dwh-loader/design.md)
 - 馬券予想モデルを起動するプロセスの置き方。契機と入力は [requirements.md](requirements.md)
-- ローダのターゲットフレームワーク
 
 テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [dwh-loader/schema.md](dwh-loader/schema.md)。

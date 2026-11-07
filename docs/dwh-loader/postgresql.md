@@ -4,16 +4,19 @@
 - 日付: 2026-11-07
 - 要求: [requirements.md](requirements.md)
 - 構造: [architecture.md](architecture.md)
+- 設計: [design.md](design.md)
 - データベース定義書: [schema.md](schema.md)
-- 位置づけ: 収集アプリと同じ PC に PostgreSQL 18 を入れる手順。テーブル、主キー、ビューは [schema.md](schema.md)。ローダ用ロールの権限とバックアップは未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- 位置づけ: 収集アプリと同じ PC に PostgreSQL 18 を入れる手順。テーブル、主キー、ビューは [schema.md](schema.md)。ローダ用ロールの権限は [design.md](design.md)。バックアップは未決。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
 
 倉庫は、契約者本人の日本語版 Windows 11 で動く PostgreSQL 18 である。入手元は [PostgreSQL の Windows インストーラ](https://www.postgresql.org/download/windows/) が案内する EDB のインストーラとし、そのページに出る 18 系の現行マイナーを入れる。18 のコミュニティサポートは 2030-11-14 までである。
 
-サーバは Windows サービス `postgresql-x64-18` として常駐し、待ち受けは `localhost` の `5432` だけにする。データベース名は `keiba`、エンコーディングは `UTF8`、ロケールは `C` とする。スキーマ `jv` はこの導入で空のまま作る。テーブルは [schema.md](schema.md) が決める。
+サーバは Windows サービス `postgresql-x64-18` として常駐し、待ち受けは `localhost` の `5432` だけにする。エンコーディングは `UTF8`、ロケールは `C` とする。
 
-接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。確認のための接続ユーザはスーパーユーザ `postgres` である。ローダが使うログインロールは、権限が決まるまで定めない。
+データベース `keiba` は、この PC の競馬データ倉庫である。提供元ごとにスキーマを分ける。いま作るスキーマ `jv` は、JRA-VAN Data Lab. の JV-Data である。中身は、収集アプリが残す蓄積と速報をローダが解釈した行で、この導入では空のまま作る。テーブルは [schema.md](schema.md) が決める。別の競馬データを足すときは、同じデータベースにスキーマを追加する。スキーマ名は、その提供元が読める名前を、足すときに決める。`jv` のテーブルへは入れない。
+
+接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。確認のための接続ユーザはスーパーユーザ `postgres` である。ローダが使うログインロールは `keiba_loader` とする。権限は [design.md](design.md)。
 
 ## 2. 入れるもの
 
@@ -92,17 +95,24 @@ Get-Service postgresql-x64-18
 ```powershell
 $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 & $psql -U postgres -h localhost -p 5432 -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE keiba WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE = 'C';"
+& $psql -U postgres -h localhost -p 5432 -d postgres -v ON_ERROR_STOP=1 -c "COMMENT ON DATABASE keiba IS 'この PC の競馬データ倉庫。提供元ごとにスキーマを分ける。';"
 & $psql -U postgres -h localhost -p 5432 -d keiba -v ON_ERROR_STOP=1 -c "CREATE SCHEMA jv;"
+& $psql -U postgres -h localhost -p 5432 -d keiba -v ON_ERROR_STOP=1 -c "COMMENT ON SCHEMA jv IS 'JRA-VAN Data Lab. の JV-Data。収集アプリが残す蓄積と速報を、ローダが解釈した行。';"
 & $psql -U postgres -h localhost -p 5432 -d keiba -v ON_ERROR_STOP=1 -c "SELECT current_setting('server_version') AS version, current_database() AS database, pg_encoding_to_char(encoding) AS encoding FROM pg_database WHERE datname = current_database();"
 ```
 
-確認の結果は、バージョンが 18 で始まり、データベースが `keiba`、エンコーディングが `UTF8` である。スキーマ `jv` があることは次で見る。
+| 名前 | 種類 | 中身 |
+| --- | --- | --- |
+| `keiba` | データベース | この PC の競馬データ倉庫。提供元が増えてもデータベースは増やさず、スキーマを足す |
+| `jv` | スキーマ | JRA-VAN Data Lab. の JV-Data。今のローダが書く範囲 |
+
+確認の結果は、バージョンが 18 で始まり、データベースが `keiba`、エンコーディングが `UTF8` である。スキーマ `jv` とコメントがあることは次で見る。
 
 ```powershell
-& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h localhost -p 5432 -d keiba -c "\dn jv"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -h localhost -p 5432 -d keiba -c "\dn+ jv"
 ```
 
-ローダが接続するときに使う値は次である。ユーザとパスワードは、ロールが決まるまで空欄のままにする。
+ローダが接続するときに使う値は次である。パスワードはローダの設定に置き、この表には書かない。
 
 | 項目 | 値 |
 | --- | --- |
@@ -110,6 +120,7 @@ $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 | ポート | `5432` |
 | データベース | `keiba` |
 | スキーマ | `jv` |
+| ログインロール | `keiba_loader` |
 
 ## 6. 削除
 
@@ -119,7 +130,6 @@ $psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
 
 ## 7. 今回決めないこと
 
-- ローダ用ログインロールの名前と権限
 - バックアップとリストア
 - テーブル、主キー、ビュー。正本は [schema.md](schema.md)
-- ローダのインストール先と、完了した生データへ自動で追随する実装
+- ローダの公開スクリプト。インストール先、ロール、追随は [design.md](design.md)

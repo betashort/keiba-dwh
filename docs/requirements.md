@@ -14,7 +14,7 @@
 
 この一式のゴールは、開催日の馬体重などの速報が PostgreSQL に載り終えたとき、そのレースに必要な倉庫のフルのデータを入力にして、馬券予想モデルを自動で実行できることである。
 
-その前提は、書き込みが完了した生データに更新があったとき、利用者がそのたび起動しなくても、解釈済みの行が PostgreSQL に入ることである。
+その前提は、ローダのプロセスが動いているあいだに、書き込みが完了した生データへ更新があったとき、そのファイルのために利用者が起動しなくても、解釈済みの行が PostgreSQL に入ることである。ログオン時の自動起動はしない。
 
 ## 2. この一式ですること
 
@@ -50,7 +50,7 @@
 | DWH ローダ | 完了した生データの更新を契機に、解釈した行を PostgreSQL へ自動で書く | [dwh-loader/requirements.md](dwh-loader/requirements.md) |
 | 予想の実行 | 開始契機の速報が載り終え、フルのデータが揃ったとき、馬券予想モデルを自動で起動する | この文書の 5 |
 
-利用者の操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダが行をどう解釈するかは [dwh-loader/requirements.md](dwh-loader/requirements.md)。完了した生データへ自動で追随する実装（常駐、タスク、監視）は [dwh-loader/architecture.md](dwh-loader/architecture.md) の未決、データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)、予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
+利用者の操作、画面、取得時刻、保存形式は収集アプリの要求と設計に書く。ローダが行をどう解釈し、完了した生データへどう追随するかは [dwh-loader/design.md](dwh-loader/design.md)。データベース定義は [dwh-loader/schema.md](dwh-loader/schema.md)。予想を起動するプロセスの置き方は [architecture.md](architecture.md) の未決に残す。
 
 ## 4. データの流れ
 
@@ -100,7 +100,7 @@ flowchart LR
 - 未知のレコード種別は収集側で捨てない。採否はローダが決める。
 - 利用キーは収集アプリだけが持ち、画面とログに出さない。
 - 収集アプリと PostgreSQL は、同じ契約者の PC に置く。ローダは収集アプリのプロセスに入らない。予想の実行も、収集アプリとローダのプロセスには入らない。
-- ローダは、完了した生データの更新に追随する。利用者はファイルごと、速報ごとにローダを起動しない。
+- ローダは、プロセスが動いているあいだ、完了した生データの更新に追随する。利用者はファイルごと、速報ごとにローダを起動しない。ログオン時の登録はしない。
 - 予想の入力は、実行時点の PostgreSQL にある対象レースのフルのデータである。
 
 再試行、残量、フレーム形式、台帳の中身は [jv-data-collector/design.md](jv-data-collector/design.md)。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
@@ -111,11 +111,11 @@ flowchart LR
 2. ローダは、完了していない raw を読まない。
 3. PostgreSQL に入るのは解釈済みの行だけであり、収集アプリは PostgreSQL に接続しない。
 4. 推奨キー、データ作成年月日、速報と確定成績の優先、`0B14` の最新世代は、ローダが決める。
-5. 完了した生データが増えたあと、利用者がローダを起動しなくても、そのファイルから作る行が PostgreSQL に入る。
+5. ローダのプロセスが動いているあいだに完了した生データが増えたあと、そのファイルのために利用者がローダを起動しなくても、そのファイルから作る行が PostgreSQL に入る。
 6. 開催日に馬体重などの開始契機の速報が倉庫へ載り終え、対象レースのフルのデータが揃っているとき、馬券予想モデルが自動で実行される。
 7. その実行が読むのは、マスタ、過去走、番組、確定済みの成績、および当該開催の速報を含む、実行時点の倉庫の行である。
 8. 過去走がまだ倉庫に無いレースでは、馬体重が登録されても予想を実行しない。
 9. オッズの周回、払戻、速報マイニング、`0B15` の成績確定後の版、蓄積の差分だけでは予想を開始しない。これらは PostgreSQL には載る。
 10. 投票、購入、収支の計算は行わない。
 
-収集の手順は [jv-data-collector/requirements.md](jv-data-collector/requirements.md) の受入条件を正とする。ローダの手順は [dwh-loader/requirements.md](dwh-loader/requirements.md)。テーブル単位の確認は、データベース定義書が決まるまで未決とする。モデルの式が未定のあいだ、受入で見るのは実行の契機と入力の範囲である。
+収集の手順は [jv-data-collector/requirements.md](jv-data-collector/requirements.md) の受入条件を正とする。ローダの手順は [dwh-loader/requirements.md](dwh-loader/requirements.md) と [dwh-loader/design.md](dwh-loader/design.md)。テーブル単位の確認は、データベース定義書が項目列を書き終わるまで未決とする。モデルの式が未定のあいだ、受入で見るのは実行の契機と入力の範囲である。

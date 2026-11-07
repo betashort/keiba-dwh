@@ -317,7 +317,7 @@ SQLite に次を持つ。
 
 ### 8.3 ローダとの契約
 
-ローダの要求は [../dwh-loader/requirements.md](../dwh-loader/requirements.md)。アプリ間の境界は [../architecture.md](../architecture.md)。
+ローダの要求は [../dwh-loader/requirements.md](../dwh-loader/requirements.md)。手順は [../dwh-loader/design.md](../dwh-loader/design.md)。アプリ間の境界は [../architecture.md](../architecture.md)。
 
 ローダが読んでよいのは、完了フラグが立った raw だけ。収集側はファイルを完了にしてから索引を確定し、完了済みファイルを書き換えない。
 

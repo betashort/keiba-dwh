@@ -419,7 +419,7 @@ sequenceDiagram
 
 ## 10. ローダとの契約
 
-アプリ間の境界は [../architecture.md](../architecture.md) を正とする。ローダ側の要求と構造は [../dwh-loader/requirements.md](../dwh-loader/requirements.md) と [../dwh-loader/architecture.md](../dwh-loader/architecture.md)。
+アプリ間の境界は [../architecture.md](../architecture.md) を正とする。ローダ側の要求と構造は [../dwh-loader/requirements.md](../dwh-loader/requirements.md) と [../dwh-loader/architecture.md](../dwh-loader/architecture.md)。手順は [../dwh-loader/design.md](../dwh-loader/design.md)。
 
 ローダは収集アプリのプロセスに入れない。読む場所は `DataRoot\raw` と `DataRoot\state\ledger.sqlite` だけである。
 

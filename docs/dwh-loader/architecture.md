@@ -3,18 +3,19 @@
 - 状態: ドラフト
 - 日付: 2026-11-02
 - 要求: [requirements.md](requirements.md)
+- 設計: [design.md](design.md)
 - 全体の要求: [../requirements.md](../requirements.md)
 - 全体の構造: [../architecture.md](../architecture.md)
 - PostgreSQL: [postgresql.md](postgresql.md)
 - データベース定義書: [schema.md](schema.md)
 - 入力の形式: [../jv-data-collector/design.md](../jv-data-collector/design.md)
-- 位置づけ: ローダのプロセス境界と解釈の責務。モジュール分割と自動追随の実装は未決。テーブルと有効な版は [schema.md](schema.md)。完了した生データの更新で PostgreSQL に載せることは [requirements.md](requirements.md) で決まっている。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
+- 位置づけ: ローダのプロセス境界と解釈の責務。モジュール分割、追随、完了ファイルの読み方は [design.md](design.md)。テーブルと有効な版は [schema.md](schema.md)。完了した生データの更新で PostgreSQL に載せることは [requirements.md](requirements.md) で決まっている。レコードのバイト定義は公式仕様書を正とし、ここでは再定義しない。
 
 ## 1. 結論
 
 ローダは収集アプリとは別の C# プロセスである。JV-Link を参照しない。読むのは `DataRoot` の完了済み raw と `ledger.sqlite` であり、書くのは同一 PC の PostgreSQL である。接続には Npgsql を使う。バイト列の展開には SDK の C# 構造体を使い、収集アプリはその構造体へ展開しない。
 
-プロセスの置き方とターゲットフレームワークは未決である。収集アプリが `net10.0-windows` であることとは独立に、ローダ側で決める。
+プロセスの置き方、ターゲットフレームワーク、完了ファイルの読み方は [design.md](design.md) で決めた。収集アプリの `net10.0-windows` と x86 とは別に、ローダは `net10.0` の x64 である。起動は実行ファイルの実行であり、ログオン時の登録はしない。動いているあいだ、完了ファイルを読む。
 
 ## 2. 入出力
 
@@ -60,15 +61,12 @@ SQLite は収集アプリが WAL で開く。ローダは同時に読めるこ�
 | 言語 | C# |
 | プロセス | 収集アプリの外。COM と Windows Forms を前提にしない |
 | 接続 | Npgsql |
-| 倉庫 | PostgreSQL 18。導入は [postgresql.md](postgresql.md) |
+| 倉庫 | PostgreSQL 18 のデータベース `keiba`。書くスキーマは `jv`（JRA-VAN Data Lab. の JV-Data）。導入は [postgresql.md](postgresql.md) |
 | 構造体 | SDK の C# 版。収集アプリは使わない |
 | 秘密 | 利用キーは持たない。データベース認証はローダの設定に置く |
 
 ## 5. 未決
 
-- ソリューション構成とターゲットフレームワーク
-- 完了した生データへ自動で追随する実装を、常駐、タスク、監視のどれにするか
-- 完了ファイルをどの単位で読むか（ファイル単位、索引の差分、再解釈）
-- ローダ用ロールの権限、バックアップ。導入手順は [postgresql.md](postgresql.md)
+- バックアップとリストア。導入手順は [postgresql.md](postgresql.md)
 
-テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [schema.md](schema.md) とする。
+テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [schema.md](schema.md) とする。プロセス、ターゲットフレームワーク、完了ファイルの読み方、ロールの権限は [design.md](design.md) とする。
