@@ -5,7 +5,7 @@
 - 要求: [requirements.md](requirements.md)
 - 構造: [architecture.md](architecture.md)
 - 設計: [design.md](design.md)
-- 導入: [postgresql.md](postgresql.md)
+- PostgreSQL: [postgresql.md](postgresql.md)
 - 入力: [../jv-data-collector/design.md](../jv-data-collector/design.md)
 - 正とする仕様: JV-Data 仕様書 Ver.4.9.0.1 のフォーマットシート。推奨キーは列「キー」の `○`。`●` は時系列オッズを使うときの追加キー
 - 位置づけ: データベース `keiba` のスキーマ `jv` のテーブル、列、主キー、索引、有効な版のビュー。`jv` は JRA-VAN Data Lab. の JV-Data。項目のバイト位置と繰り返し回数は仕様書を正とし、この文書では再定義しない
@@ -334,7 +334,7 @@ SDK の C# 構造体でバイト列を切ったあと、次の規則で列へ入
 
 ## 10. 今回決めないこと
 
-- バックアップとリストア。導入手順は [postgresql.md](postgresql.md)。ロールと追随は [design.md](design.md)
+- バックアップとリストア。使用するサーバは [postgresql.md](postgresql.md)。ロールと追随は [design.md](design.md)
 - コード表の名称テーブル
 - 予想の特徴量テーブルと結果の保存先
 - `chakudo` の主キー列名。仕様の推奨キーが書き足されるまで列名は未定

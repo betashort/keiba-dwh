@@ -1,7 +1,7 @@
 # DWH ローダ アーキテクチャ
 
 - 状態: ドラフト
-- 日付: 2026-11-02
+- 日付: 2026-11-07
 - 要求: [requirements.md](requirements.md)
 - 設計: [design.md](design.md)
 - 全体の要求: [../requirements.md](../requirements.md)
@@ -13,7 +13,7 @@
 
 ## 1. 結論
 
-ローダは収集アプリとは別の C# プロセスである。JV-Link を参照しない。読むのは `DataRoot` の完了済み raw と `ledger.sqlite` であり、書くのは同一 PC の PostgreSQL である。接続には Npgsql を使う。バイト列の展開には SDK の C# 構造体を使い、収集アプリはその構造体へ展開しない。
+ローダは収集アプリとは別の C# プロセスである。JV-Link を参照しない。読むのは `DataRoot` の完了済み raw と `ledger.sqlite` であり、書くのは、この PC に入っている PostgreSQL 16 である。接続には Npgsql を使う。バイト列の展開には SDK の C# 構造体を使い、収集アプリはその構造体へ展開しない。
 
 プロセスの置き方、ターゲットフレームワーク、完了ファイルの読み方は [design.md](design.md) で決めた。収集アプリの `net10.0-windows` と x86 とは別に、ローダは `net10.0` の x64 である。起動は実行ファイルの実行であり、ログオン時の登録はしない。動いているあいだ、完了ファイルを読む。
 
@@ -61,12 +61,12 @@ SQLite は収集アプリが WAL で開く。ローダは同時に読めるこ�
 | 言語 | C# |
 | プロセス | 収集アプリの外。COM と Windows Forms を前提にしない |
 | 接続 | Npgsql |
-| 倉庫 | PostgreSQL 18 のデータベース `keiba`。書くスキーマは `jv`（JRA-VAN Data Lab. の JV-Data）。導入は [postgresql.md](postgresql.md) |
+| 倉庫 | この PC に入っている PostgreSQL 16 のデータベース `keiba`。サービスは `postgresql-x64-16`、ポートは `5432`。書くスキーマは `jv`（JRA-VAN Data Lab. の JV-Data）。サーバは [postgresql.md](postgresql.md) |
 | 構造体 | SDK の C# 版。収集アプリは使わない |
 | 秘密 | 利用キーは持たない。データベース認証はローダの設定に置く |
 
 ## 5. 未決
 
-- バックアップとリストア。導入手順は [postgresql.md](postgresql.md)
+- バックアップとリストア。使用するサーバは [postgresql.md](postgresql.md)
 
 テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [schema.md](schema.md) とする。プロセス、ターゲットフレームワーク、完了ファイルの読み方、ロールの権限は [design.md](design.md) とする。

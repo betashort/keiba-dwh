@@ -1,7 +1,7 @@
 # 競馬データ倉庫 アーキテクチャ
 
 - 状態: ドラフト
-- 日付: 2026-11-03
+- 日付: 2026-11-07
 - 要求: [requirements.md](requirements.md)
 - 収集アプリ: [jv-data-collector/architecture.md](jv-data-collector/architecture.md)
 - ローダ: [dwh-loader/architecture.md](dwh-loader/architecture.md)
@@ -102,7 +102,7 @@ flowchart TB
 
 収集アプリのバイナリの置き場所と更新は [jv-data-collector/deployment.md](jv-data-collector/deployment.md)。
 
-PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
+使用する PostgreSQL は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 
 ## 5. 技術選定
 
@@ -111,7 +111,7 @@ PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 | 収集アプリ | C#、Windows Forms、x86、`net10.0-windows` | [jv-data-collector/architecture.md](jv-data-collector/architecture.md) |
 | 収集の台帳 | SQLite。WAL。アプリとローダが同時に読める | 同上 |
 | 生データ | 追記フレーム。文字コード変換と項目分割をしない | [jv-data-collector/design.md](jv-data-collector/design.md) |
-| 倉庫 | PostgreSQL 18 のデータベース `keiba`。JRA-VAN の JV-Data はスキーマ `jv`。別の競馬データはスキーマを足す | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
+| 倉庫 | この PC に入っている PostgreSQL 16 のデータベース `keiba`。サービスは `postgresql-x64-16`、ポートは `5432`。JRA-VAN の JV-Data はスキーマ `jv`。別の競馬データはスキーマを足す | [dwh-loader/postgresql.md](dwh-loader/postgresql.md) |
 | ローダ | 別プロセスの C#。接続は Npgsql。構造体は SDK の C# 版 | [dwh-loader/architecture.md](dwh-loader/architecture.md) |
 | 時刻 | 台帳に残す瞬間は UTC。JV-Link との境界とカレンダーは日本標準時 | 収集アプリの設計 |
 
@@ -131,13 +131,13 @@ PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 | [dwh-loader/requirements.md](dwh-loader/requirements.md) | ローダが満たすこと |
 | [dwh-loader/architecture.md](dwh-loader/architecture.md) | ローダの入出力と解釈の責務 |
 | [dwh-loader/design.md](dwh-loader/design.md) | 追随の手順、完了ファイルの読み方、展開、受入条件 |
-| [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | PostgreSQL 18 の導入 |
+| [dwh-loader/postgresql.md](dwh-loader/postgresql.md) | この PC に入っている PostgreSQL 16 |
 | [dwh-loader/schema.md](dwh-loader/schema.md) | データベース定義。テーブル、主キー、有効な版のビュー |
 | [reference/](reference/) | 公式 SDK。バイト定義の正本は仕様書 |
 
 ## 7. 未決
 
-- バックアップとリストア。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。ローダのプロセスと権限は [dwh-loader/design.md](dwh-loader/design.md)
+- バックアップとリストア。使用する PostgreSQL は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。ローダのプロセスと権限は [dwh-loader/design.md](dwh-loader/design.md)
 - 馬券予想モデルを起動するプロセスの置き方。契機と入力は [requirements.md](requirements.md)
 
 テーブル、主キー、有効な版、特別登録馬の区分 1 と区分 2 は [dwh-loader/schema.md](dwh-loader/schema.md)。

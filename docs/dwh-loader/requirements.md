@@ -1,7 +1,7 @@
 # DWH ローダ 要求
 
 - 状態: ドラフト
-- 日付: 2026-11-02
+- 日付: 2026-11-07
 - 対象: 収集アプリが残した完了済みの生データの更新を解釈し、PostgreSQL へ自動で書くプロセス
 - 全体の要求: [../requirements.md](../requirements.md)
 - 全体の構造: [../architecture.md](../architecture.md)
@@ -42,7 +42,7 @@
 
 読む場所は `DataRoot\raw` と `DataRoot\state\ledger.sqlite` だけである。フレームの並びと台帳の中身は、収集アプリの設計のランディングを正とする。
 
-接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。PostgreSQL は収集アプリと同じ PC で動かす。データベース `keiba` はこの PC の競馬データ倉庫で、ローダが書くスキーマ `jv` は JRA-VAN Data Lab. の JV-Data である。別の競馬データは同じデータベースの別スキーマに置く。導入は [postgresql.md](postgresql.md)。
+接続のホスト、ポート、データベース名、認証はローダの設定に置く。収集アプリの `config.json` には置かない。PostgreSQL は収集アプリと同じ PC で動かす。データベース `keiba` はこの PC の競馬データ倉庫で、ローダが書くスキーマ `jv` は JRA-VAN Data Lab. の JV-Data である。別の競馬データは同じデータベースの別スキーマに置く。使用するサーバは [postgresql.md](postgresql.md)。
 
 ## 3. 守ること
 

@@ -1,7 +1,7 @@
 # 競馬データ倉庫 要求
 
 - 状態: ドラフト
-- 日付: 2026-11-03
+- 日付: 2026-11-07
 - 対象: 契約者の PC に JV-Data を残し、完了した生データの更新を PostgreSQL へ自動で載せ、開催日の速報が揃ったときに馬券予想モデルをフルデータで自動実行する一式
 - 構造: [architecture.md](architecture.md)
 - 収集アプリ: [jv-data-collector/requirements.md](jv-data-collector/requirements.md)
@@ -103,7 +103,7 @@ flowchart LR
 - ローダは、プロセスが動いているあいだ、完了した生データの更新に追随する。利用者はファイルごと、速報ごとにローダを起動しない。ログオン時の登録はしない。
 - 予想の入力は、実行時点の PostgreSQL にある対象レースのフルのデータである。
 
-再試行、残量、フレーム形式、台帳の中身は [jv-data-collector/design.md](jv-data-collector/design.md)。PostgreSQL の導入は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
+再試行、残量、フレーム形式、台帳の中身は [jv-data-collector/design.md](jv-data-collector/design.md)。使用する PostgreSQL は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 
 ## 7. できていると言える条件
 
