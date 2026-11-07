@@ -17,6 +17,7 @@ public sealed class TrayApplication : ApplicationContext
     private readonly EventWaitHandle _showRequest;
     private ImportProgressForm? _progressForm;
     private StatusForm? _statusForm;
+    private HomeForm? _homeForm;
     private int _dismissedRun;
     private bool _closingProgress;
 
@@ -42,6 +43,7 @@ public sealed class TrayApplication : ApplicationContext
         _busy = IconFactory.Circle(Color.DodgerBlue);
         _alert = IconFactory.Circle(Color.OrangeRed);
         var menu = new ContextMenuStrip();
+        menu.Items.Add("ホーム", null, (_, _) => ShowHome());
         menu.Items.Add("今すぐ取得", null, (_, _) => FetchNow());
         menu.Items.Add("セットアップ", null, (_, _) => Setup());
         menu.Items.Add("蓄積データ", null, (_, _) => ShowStored());
@@ -57,6 +59,7 @@ public sealed class TrayApplication : ApplicationContext
             Text = "競馬データ収集",
             ContextMenuStrip = menu,
         };
+        _icon.DoubleClick += (_, _) => ShowHome();
         _timer.Tick += (_, _) => UpdateIcon();
         _timer.Start();
         UpdateIcon();
@@ -80,7 +83,7 @@ public sealed class TrayApplication : ApplicationContext
             return;
         }
 
-        var answer = MessageBox.Show(
+        var answer = Tell(
             "全期間の取り込みを開始します。容量が大きく、JV-Link のダイアログが出ます。",
             "セットアップ",
             MessageBoxButtons.OKCancel,
@@ -98,7 +101,7 @@ public sealed class TrayApplication : ApplicationContext
     {
         var config = _configs.Load();
         using var form = new StoredScheduleForm(config);
-        if (form.ShowDialog() != DialogResult.OK || form.Rows is null)
+        if (OpenDialog(form) != DialogResult.OK || form.Rows is null)
         {
             return;
         }
@@ -115,7 +118,7 @@ public sealed class TrayApplication : ApplicationContext
     {
         var config = _configs.Load();
         using var form = new RealtimeScheduleForm(config);
-        if (form.ShowDialog() != DialogResult.OK || form.Data is null || form.Rules is null)
+        if (OpenDialog(form) != DialogResult.OK || form.Data is null || form.Rules is null)
         {
             return;
         }
@@ -128,16 +131,47 @@ public sealed class TrayApplication : ApplicationContext
         _log.Info("realtime schedule saved");
     }
 
-    public void ShowStatusOnStart()
+    public void ShowHomeOnStart()
     {
         var once = new System.Windows.Forms.Timer { Interval = 1 };
         once.Tick += (_, _) =>
         {
             once.Stop();
             once.Dispose();
-            ShowStatus();
+            ShowHome();
         };
         once.Start();
+    }
+
+    private void ShowHome()
+    {
+        if (_homeForm is { IsDisposed: false })
+        {
+            if (_homeForm.WindowState == FormWindowState.Minimized)
+            {
+                _homeForm.WindowState = FormWindowState.Normal;
+            }
+
+            _homeForm.Activate();
+            return;
+        }
+
+        var form = new HomeForm(
+            () => _coordinator.Status(DateTimeOffset.UtcNow),
+            () => _coordinator.Progress,
+            () => _attention.HasAttention ? _attention.Message : null,
+            () => _coordinator.CollectionPaused,
+            new HomeCommands(FetchNow, Setup, ShowStored, ShowRealtime, ShowStatus, OpenJvSettings, OpenLogs));
+        _homeForm = form;
+        form.FormClosed += (_, _) =>
+        {
+            if (ReferenceEquals(_homeForm, form))
+            {
+                _homeForm = null;
+            }
+        };
+        form.Show();
+        form.Activate();
     }
 
     private void ShowStatus()
@@ -174,7 +208,7 @@ public sealed class TrayApplication : ApplicationContext
         var code = _worker.SetUiProperties();
         if (code == -100)
         {
-            MessageBox.Show("JV-Link の設定画面を開けません。", "JV-Link 設定", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            Tell("JV-Link の設定画面を開けません。", "JV-Link 設定", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -190,7 +224,7 @@ public sealed class TrayApplication : ApplicationContext
         if (!JvRegistration.IsInstalled)
         {
             using var guide = new GuideForm();
-            guide.ShowDialog();
+            OpenDialog(guide);
             return false;
         }
 
@@ -207,8 +241,16 @@ public sealed class TrayApplication : ApplicationContext
     {
         var config = _configs.Load();
         using var form = new SetupForm(config, _secrets.Exists, JvRegistration.IsInstalled, SaveSetup);
-        form.ShowDialog();
+        OpenDialog(form);
     }
+
+    private DialogResult OpenDialog(Form form) =>
+        _homeForm is { IsDisposed: false } owner ? form.ShowDialog(owner) : form.ShowDialog();
+
+    private DialogResult Tell(string text, string title, MessageBoxButtons buttons, MessageBoxIcon icon) =>
+        _homeForm is { IsDisposed: false } owner
+            ? MessageBox.Show(owner, text, title, buttons, icon)
+            : MessageBox.Show(text, title, buttons, icon);
 
     private string? SaveSetup(SetupInput input)
     {
@@ -278,7 +320,7 @@ public sealed class TrayApplication : ApplicationContext
     {
         if (_showRequest.WaitOne(0))
         {
-            ShowStatus();
+            ShowHome();
         }
 
         var progress = _coordinator.Progress;
@@ -368,6 +410,11 @@ public sealed class TrayApplication : ApplicationContext
         if (_statusForm is { IsDisposed: false })
         {
             _statusForm.Close();
+        }
+
+        if (_homeForm is { IsDisposed: false })
+        {
+            _homeForm.Close();
         }
 
         _coordinator.RequestShutdown();

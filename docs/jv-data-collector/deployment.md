@@ -19,7 +19,7 @@
 
 `%LocalAppData%\Programs\KeibaDwh\Collector\`
 
-ログオン起動は、初回設定が `JvDataCollector.exe` のフルパスと `--background` を `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に書く。`--background` では「状態」を開かない。設定、利用キー、生データ、台帳はインストール先の外にあり、差し替えでも削除でも触らない。
+ログオン起動は、初回設定が `JvDataCollector.exe` のフルパスと `--background` を `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` に書く。`--background` では「ホーム」を開かない。設定、利用キー、生データ、台帳はインストール先の外にあり、差し替えでも削除でも触らない。
 
 前提は、利用者が別に入れた公式の JV-Link 5.0.0 32bit だけである。JV-Link、利用キー、JV-Data は同梱しない。
 
@@ -139,7 +139,7 @@ robocopy $stage $dest /MIR
 ```powershell
 Start-Process (Join-Path $env:LOCALAPPDATA "Programs\KeibaDwh\Collector\JvDataCollector.exe")
 ```
-5. Run に書く値は、バージョンを含まない次のコマンドである。`--background` はログオン時に「状態」を開かないための引数である。
+5. Run に書く値は、バージョンを含まない次のコマンドである。`--background` はログオン時に「ホーム」を開かないための引数である。
 
 `"%LocalAppData%\Programs\KeibaDwh\Collector\JvDataCollector.exe" --background`
 

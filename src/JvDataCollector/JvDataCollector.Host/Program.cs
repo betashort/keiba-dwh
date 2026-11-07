@@ -95,7 +95,7 @@ internal static class Program
 
         if (!background && JvRegistration.IsInstalled && configs.Load().SettingsComplete && secrets.Exists)
         {
-            tray.ShowStatusOnStart();
+            tray.ShowHomeOnStart();
         }
 
         Thread? repairThread = null;
@@ -138,7 +138,7 @@ internal static class Program
         store.Dispose();
     }
 
-    private static void SignalShowStatus()
+    private static void SignalShowHome()
     {
         try
         {
@@ -161,7 +161,7 @@ internal static class Program
             }
 
             mutex.Dispose();
-            SignalShowStatus();
+            SignalShowHome();
             return null;
         }
         catch (AbandonedMutexException)

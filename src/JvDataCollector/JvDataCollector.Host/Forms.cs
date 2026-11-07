@@ -288,3 +288,124 @@ public sealed class ImportProgressForm : Form
         Activate();
     }
 }
+
+public sealed record HomeCommands(
+    Action FetchNow,
+    Action Setup,
+    Action Stored,
+    Action Realtime,
+    Action Status,
+    Action JvSettings,
+    Action Logs);
+
+public sealed class HomeForm : Form
+{
+    private readonly Func<IReadOnlyList<StatusLine>> _rows;
+    private readonly Func<ProgressSnapshot> _progress;
+    private readonly Func<string?> _attention;
+    private readonly Func<bool> _preparing;
+    private readonly Label _state = new() { AutoSize = false };
+    private readonly ProgressBar _bar = new();
+    private readonly ListView _list = new()
+    {
+        View = View.Details,
+        FullRowSelect = true,
+        GridLines = true,
+        MultiSelect = false,
+        HeaderStyle = ColumnHeaderStyle.Nonclickable,
+    };
+    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
+    private string _stamp = "\0";
+
+    public HomeForm(
+        Func<IReadOnlyList<StatusLine>> rows,
+        Func<ProgressSnapshot> progress,
+        Func<string?> attention,
+        Func<bool> preparing,
+        HomeCommands commands)
+    {
+        _rows = rows;
+        _progress = progress;
+        _attention = attention;
+        _preparing = preparing;
+        AutoScaleMode = AutoScaleMode.None;
+        Text = "ホーム";
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        StartPosition = FormStartPosition.CenterScreen;
+        MaximizeBox = false;
+        MinimizeBox = true;
+        ShowInTaskbar = true;
+        ClientSize = DialogPx.Z(640, 416);
+        _state.Location = DialogPx.P(16, 16);
+        _state.Size = DialogPx.Z(608, 36);
+        _bar.Location = DialogPx.P(16, 60);
+        _bar.Size = DialogPx.Z(608, 18);
+        _list.Location = DialogPx.P(16, 92);
+        _list.Size = DialogPx.Z(608, 228);
+        _list.Columns.Add("種類", DialogPx.S(360));
+        _list.Columns.Add("次回", DialogPx.S(220));
+        var fetch = Command("今すぐ取得", 16, 336, commands.FetchNow);
+        var setup = Command("セットアップ", 170, 336, commands.Setup);
+        var stored = Command("蓄積データ", 324, 336, commands.Stored);
+        var realtime = Command("開催日の速報", 478, 336, commands.Realtime);
+        var status = Command("状態", 16, 372, commands.Status);
+        var jv = Command("JV-Link 設定", 170, 372, commands.JvSettings);
+        var logs = Command("ログの場所", 324, 372, commands.Logs);
+        var close = Command("閉じる", 478, 372, Close);
+        Controls.AddRange([_state, _bar, _list, fetch, setup, stored, realtime, status, jv, logs, close]);
+        CancelButton = close;
+        _timer.Tick += (_, _) => RefreshView();
+        _timer.Start();
+        FormClosed += (_, _) => _timer.Dispose();
+        RefreshView();
+    }
+
+    private Button Command(string text, int x, int y, Action action)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Location = DialogPx.P(x, y),
+            Size = DialogPx.Z(146, 28),
+        };
+        button.Click += (_, _) => action();
+        return button;
+    }
+
+    private void RefreshView()
+    {
+        var attention = _attention();
+        if (!string.IsNullOrEmpty(attention))
+        {
+            ProgressView.Apply(_state, _bar, _progress(), attention);
+        }
+        else if (_preparing())
+        {
+            ProgressView.Apply(_state, _bar, ProgressSnapshot.Idle, null);
+            _state.Text = "起動準備";
+        }
+        else
+        {
+            ProgressView.Apply(_state, _bar, _progress(), null);
+        }
+
+        var rows = _rows();
+        var stamp = string.Join('\n', rows.Select(row => row.Name + "\t" + row.Next));
+        if (stamp == _stamp)
+        {
+            return;
+        }
+
+        _stamp = stamp;
+        _list.BeginUpdate();
+        _list.Items.Clear();
+        foreach (var row in rows)
+        {
+            var item = new ListViewItem(row.Name);
+            item.SubItems.Add(row.Next);
+            _list.Items.Add(item);
+        }
+
+        _list.EndUpdate();
+    }
+}
