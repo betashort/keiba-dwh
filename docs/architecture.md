@@ -18,7 +18,7 @@
 
 DWH ローダは別プロセスである。完了した raw の更新と、それを指す索引だけを読み、解釈した行を PostgreSQL に書く。起動は実行ファイルの実行であり、ログオン時の登録はしない。プロセスが動いているあいだ、ファイルごとには起動しない。状態と設定の窓を持つ。通知領域には置かない。JV-Link は呼ばない。予想モデルは起動しない。
 
-公式 SDK の実体は [reference/](reference/) に置く。収集アプリとローダのどちらにも同梱しない。
+公式 SDK の実体は [reference/](reference/) に置く。収集アプリには同梱しない。ローダが展開に使う C# 構造体定義だけは `DwhLoader.Structs` にコピーする。zip、仕様書、JV-Link はローダにも同梱しない。
 
 ## 2. システムコンテキスト
 
@@ -100,7 +100,7 @@ flowchart TB
 | `DataRoot\state\ledger.sqlite` | 収集アプリ | 水位、実行履歴、索引、`0B14` の世代 |
 | PostgreSQL | ローダ | 解釈済みの行。同一 PC |
 
-収集アプリのバイナリの置き場所と更新は [jv-data-collector/deployment.md](jv-data-collector/deployment.md)。
+収集アプリのバイナリの置き場所と更新は [jv-data-collector/deployment.md](jv-data-collector/deployment.md)。ローダのバイナリの置き場所と更新は [dwh-loader/design.md](dwh-loader/design.md)。
 
 使用する PostgreSQL は [dwh-loader/postgresql.md](dwh-loader/postgresql.md)。
 

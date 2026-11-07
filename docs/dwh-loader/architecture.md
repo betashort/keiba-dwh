@@ -52,7 +52,7 @@ SQLite は収集アプリが WAL で開く。ローダは同時に読めるこ�
 
 収集アプリがすでに決めたことには手を入れない。フレームのハッシュ重複、水位、再開カーソル、速報の取得間隔は収集側の責務である。
 
-公式仕様の版と、収集が残す dataspec の範囲は [../jv-data-collector/design.md](../jv-data-collector/design.md) を正とする。SDK のファイルは [../reference/](../reference/) にある。
+公式仕様の版と、収集が残す dataspec の範囲は [../jv-data-collector/design.md](../jv-data-collector/design.md) を正とする。SDK のファイルは [../reference/](../reference/) にある。ローダがコンパイルする C# 構造体は、その 64bit 版から `DwhLoader.Structs` へコピーした `JVData_Struct.cs` である。
 
 ## 4. 技術選定
 

@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DwhLoader.Application/DwhLoader.Application.csproj" />
+  <Project Path="DwhLoader.Host/DwhLoader.Host.csproj" />
+  <Project Path="DwhLoader.Storage/DwhLoader.Storage.csproj" />
+  <Project Path="DwhLoader.Structs/DwhLoader.Structs.csproj" />
+  <Project Path="DwhLoader.Tests/DwhLoader.Tests.csproj" />
+</Solution>

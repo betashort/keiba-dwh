@@ -97,4 +97,3 @@ $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
 
 - バックアップとリストア
 - テーブル、主キー、ビュー。正本は [schema.md](schema.md)
-- ローダの公開スクリプト。インストール先、ロール、追随は [design.md](design.md)

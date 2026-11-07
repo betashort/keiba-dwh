@@ -32,7 +32,7 @@
 | `DwhLoader.Host` | ミューテックス、設定、周回の待ち、ログ、状態の窓、設定の窓 |
 | `DwhLoader.Application` | ファイルの選択、展開、値の置き方、写しの中身。SQL を持たない |
 | `DwhLoader.Storage` | 台帳の読み取りと PostgreSQL への書き込み。Application のポートを実装する |
-| `DwhLoader.Structs` | `docs/reference` にある SDK の C# 構造体定義だけをコンパイルする |
+| `DwhLoader.Structs` | SDK 5.0.0 の C# 構造体定義 `JVData_Struct.cs` をコンパイルする |
 | `DwhLoader.Tests` | JV-Link を使わない自動テスト |
 
 ```mermaid
@@ -48,13 +48,23 @@ flowchart TB
   app --> structs
 ```
 
-`DwhLoader.Structs` はサンプルのエントリ ポイントを含めない。構造体の定義ファイルが一つも無いときはビルドを失敗させる。ソースはリポジトリにコミットしない。公開フォルダに SDK の zip、仕様書、JV-Link は入れない。
+`DwhLoader.Structs` はサンプルのエントリ ポイントを含めない。構造体定義は SDK 5.0.0（64bit）の C# 版 `JVData_Struct.cs` をプロジェクトへコピーし、`docs/reference` はコンパイルに使わない。公開フォルダに SDK の zip、仕様書、JV-Link は入れない。
 
-公開単位は `win-x64` の自己完結フォルダとする。単一ファイルにはしない。`Microsoft.Data.Sqlite` のネイティブ ライブラリを同じフォルダに置く。インストール先は次の固定パスである。公開スクリプトは今回置かない。
+公開単位は `win-x64` の自己完結フォルダとする。単一ファイルにはしない。`Microsoft.Data.Sqlite` のネイティブ ライブラリを同じフォルダに置く。インストール先は次の固定パスである。
 
 `%LocalAppData%\Programs\KeibaDwh\Loader\`
 
 実行ファイル名は `DwhLoader.exe`。二重起動は名前付きミューテックス `Local\KeibaDwh.Loader` で拒む。後発は終了コード 0 で終わる。
+
+公開と、インストール先へのミラーは、リポジトリのルートで次を実行する。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy-loader.ps1
+```
+
+スクリプトは、`dotnet publish` で `%TEMP%\KeibaDwh.Loader.publish` へ出し、インストール先だけを `robocopy /MIR` する。`dotnet build` の出力はコピーしない。`%AppData%`、`DataRoot`、PostgreSQL は対象にしない。配置のあと exe は起動しない。`DwhLoader` が実行中のときは、状態の窓の「停止」を待つ。プロセスは止めない。待ちをやめるときは Ctrl+C でスクリプトを止める。終了したあとに公開を始める。ファイルがロックされたままのときは、再試行 2 回のあと失敗で終わる。
+
+`robocopy` の終了コードが 0 から 7 のとき、スクリプトの終了コードは 0 である。8 以上はその終了コードのまま失敗である。公開結果に `DwhLoader.exe` と `e_sqlite3.dll` が無いときも失敗である。
 
 ## 3. 周回
 
@@ -227,6 +237,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+![投入中。先頭は id と dataspec。倉庫は接続できている。一覧は書いています、書けた、再試行待ち](images/writing.png)
+
 待機は同じ窓で、先頭とこの周回の行が変わる。台帳を開けないときは倉庫を「確認していません」とし、PostgreSQL に届かないときは倉庫を「届かない」とする。どちらも一覧を出さず、写しは「前回の写しのまま」である。スキーマ未適用のときは接続できていて、一覧は出さない。
 
 ```text
@@ -245,6 +257,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+![待機。この周回は 0 件。一覧は 0B15 が書けた](images/waiting.png)
+
 ```text
 ┌ DWH ローダ ──────────────────────────────────────────────────────────┐
 │ 台帳を開けません                                                     │
@@ -257,6 +271,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+![台帳を開けません。倉庫は確認していません。写しは前回のまま。一覧は無い](images/ledger.png)
+
 ```text
 ┌ DWH ローダ ──────────────────────────────────────────────────────────┐
 │ スキーマ未適用                                                       │
@@ -268,6 +284,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 │ [設定] [ログの場所]                                       [停止]     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+![スキーマ未適用。倉庫は接続できている。一覧は無い](images/schema.png)
 
 | 操作 | すること |
 | --- | --- |
@@ -297,6 +315,8 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 └──────────────────────────────────────────────────────────┘
 ```
 
+![初期設定。保存先、ホスト、ポート、データベース、ユーザ名、パスワード。閉じると保存して開始](images/setup.png)
+
 ```text
 ┌ 設定 ────────────────────────────────────────────────────┐
 │ 保存先        [ D:\KeibaData                     ]       │
@@ -313,7 +333,9 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 └──────────────────────────────────────────────────────────┘
 ```
 
-上の枠の数値とパスは、並びを示す見本である。
+![設定。パスワードは空欄。保存した接続は次の周回から使う。キャンセルと保存](images/settings.png)
+
+上の枠と写真の数値とパスは、並びを示す見本である。
 
 ## 10. 失敗とログ
 
@@ -350,7 +372,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA jv GRANT SELECT, INSERT ON TABLES TO keiba_lo
 
 ## 12. 今回決めないこと
 
-- 公開スクリプトと、フォルダの差し替え手順
 - バックアップとリストア
 - `chakudo` の主キー列名。schema に書き足されるまでは `unparsed` に入り、親テーブルへの入れ直しは再解釈で行う
 - コード表の名称テーブル
